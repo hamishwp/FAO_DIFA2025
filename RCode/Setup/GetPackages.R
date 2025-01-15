@@ -1,6 +1,6 @@
 directory<-paste0(getwd(),"/")
 # Prep work
-dir.create("./Data/RawData/")
+dir.create("./Data/RawData/",showWarnings = F)
 
 GetSourceFiles<-function(){
   
@@ -15,6 +15,8 @@ GetSourceFiles<-function(){
   source(paste0(directory,'RCode/Data_Wrangling/GetDesinventar.R'))
   source(paste0(directory,'RCode/Data_Wrangling/GetEMDAT.R'))
   source(paste0(directory,'RCode/Data_Wrangling/GetGIDD.R'))
+  # Food and agriculture related:
+  source(paste0(directory,'RCode/Data_Wrangling/GetFAOSTAT.R'))
 }
 
 LoadLibraries<-function(){
