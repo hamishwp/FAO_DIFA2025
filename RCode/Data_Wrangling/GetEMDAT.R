@@ -164,7 +164,13 @@ CleanEMDAT_API<-function(EMDAT){
     -hazlink,
     -haz_potlink,
     -classif_key,
-    -location
+    -location,
+    -No.Injured,
+    -No.Homeless,
+    -No.Affected,
+    -Total.Affected,
+    -Total.Damages,
+    -Total.Deaths
   )
   
 }
