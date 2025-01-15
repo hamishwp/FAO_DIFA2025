@@ -203,6 +203,37 @@ CleanFAOSTAT <- function(FAOSTAT){
       Item
     )
   
-
+  MF <- FAO_F1%>%
+    filter(
+      !( #Remove all Elements which are not multiplying factors
+        Element == "Yield" |
+          Element == "Yield/Carcass Weight"|
+          Element == "Production" |
+          Element == "Stocks"
+      )
+    )%>%
+    mutate(
+      multiply_fact = fifelse(
+        Unit == "1000 Head" | Unit == "1000 No",
+        Value*1000,
+        Value
+      ),
+      multiply_fact = fifelse(
+        Item=="Natural honey"|Item=="Beeswax",
+        1,
+        multiply_fact
+      )
+    )%>%
+    select(
+      multiply_fact,
+      ISO3.CODE,
+      Item,
+      Year
+    )%>%
+    arrange(
+      ISO3.CODE,
+      Year,
+      Item
+    )
   
 }
