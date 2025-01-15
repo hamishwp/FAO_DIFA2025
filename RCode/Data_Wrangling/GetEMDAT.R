@@ -13,7 +13,14 @@ EMDATHazards_API<-function(EMDAT){
   colConv$subtype%<>%str_to_lower()
   # Reduce the translated vector and merge
   EMDAT%<>%left_join(colConv,by = c("subgroup","type","subtype"),
-                     relationship="many-to-one")
+                     relationship="many-to-one")%>%
+    mutate(
+      haz_Ab = ifelse(
+        type == "volcanic activity",
+        "VO",
+        haz_Ab
+      )
+    )
   
   EMDAT%>%dplyr::select(-c(group,subgroup,type,subtype,associated_types,subregion))
 } 
