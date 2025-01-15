@@ -117,9 +117,9 @@ CleanEMDAT_API<-function(EMDAT){
 }
 
 # Directly extract the data from the EM-DAT API
-API_EMDAT<-function(yr=NULL){
+API_EMDAT<-function(syear=NULL,fyear=1990){
   # Set the upper limit for the year
-  if(is.null(yr)) yr<-AsYear(Sys.Date())
+  if(is.null(syear)) syear<-AsYear(Sys.Date())
   
   query_str = 
     'query monty {
@@ -127,7 +127,7 @@ API_EMDAT<-function(yr=NULL){
       public_emdat(
         cursor: {limit: -1}
         filters: {
-          from: 1990,
+          from: @@@@,
           to: ####,
           classif: ["nat-*"],
           include_hist: true
@@ -189,7 +189,8 @@ API_EMDAT<-function(yr=NULL){
       }
     }'
   
-  query_str<-gsub("####",yr,query_str)
+  query_str<-gsub("####",syear,query_str)
+  query_str<-gsub("@@@@",fyear,query_str)
   # setup the connection with the GraphQL database
   client <- ghql::GraphqlClient$new(
     url = "https://api.emdat.be/v1",
