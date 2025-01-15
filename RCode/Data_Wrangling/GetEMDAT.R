@@ -86,6 +86,24 @@ CleanEMDAT_API<-function(EMDAT){
                             end_day,end_month,end_year,
                             country,region))
   
+  # Only saving disasters of interest
+  disaster_type_list = c( 
+    "Drought",
+    "Earthquake",
+    "Extreme temperature",
+    "Flood",
+    "Insect infestation",
+    "Landslide",
+    "Storm", 
+    "Wildfire",
+    "Volcanic activity", 
+    "Mass movement (dry)"
+  )
+  
+  EMDAT%<>%filter( 
+    type %in% disaster_type_list
+  )
+  
   # # Extract the admin level of each entry
   # EMDAT$imp_spat_res<-0
   # # extract which entries have adm level 1
@@ -117,7 +135,7 @@ CleanEMDAT_API<-function(EMDAT){
 }
 
 # Directly extract the data from the EM-DAT API
-API_EMDAT<-function(syear=1990,fyear=NULL){
+API_EMDAT<-function(syear=1991,fyear=NULL){
   # Set the upper limit for the year
   if(is.null(fyear)) fyear<-AsYear(Sys.Date())
   
