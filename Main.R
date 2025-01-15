@@ -1,7 +1,7 @@
 # Welcome to the FAO DIFA repository!
 # Developed by:
 # - Priti Rajagopalan
-# - Nina
+# - Nina Deliu
 # - Ignacio Acosta
 # - Hamish Patten
 
