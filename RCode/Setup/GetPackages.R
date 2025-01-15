@@ -1,6 +1,6 @@
 directory<-paste0(getwd(),"/")
 # Prep work
-dir.create("./Data/RawData/")
+dir.create("./Data/RawData/",showWarnings = F)
 
 GetSourceFiles<-function(){
   
