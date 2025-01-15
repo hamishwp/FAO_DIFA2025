@@ -15,13 +15,14 @@ EMDATHazards_API<-function(EMDAT){
   EMDAT%<>%left_join(colConv,by = c("subgroup","type","subtype"),
                      relationship="many-to-one")
   
-  EMDAT%>%dplyr::select(-c(group,subgroup,type,subtype,associated_types))
+  EMDAT%>%dplyr::select(-c(group,subgroup,type,subtype,associated_types,subregion))
 } 
 
 # Clean up the EM-DAT data, such as converting from day, month, year to date
 CleanEMDAT_API<-function(EMDAT){
   # Some of the column names are messed up due to presence of non-letters
-  EMDAT%<>%rename("AID.Contribution"="aid_contribution",
+  EMDAT%<>%rename("ISO3.CODE" = "iso",
+                  "AID.Contribution"="aid_contribution",
                   "Reconstruction.Costs"="reconstr_dam",
                   "Reconstruction.Costs.Adjusted"="reconstr_dam_adj",
                   "Insured.Damages"="insur_dam",
@@ -132,6 +133,40 @@ CleanEMDAT_API<-function(EMDAT){
   
   # Link to the hazard taxonomy from HIPS
   EMDAT%<>%EMDATHazards_API()%>%return()
+  
+  #REMOVE IRRELEVANT VARIABLES
+  
+  EMDAT%<>%select( 
+    -external_ids,
+    -name,
+    -origin,
+    -ofda_response,
+    -appeal,
+    -declaration,
+    -AID.Contribution,
+    -magnitude,
+    -magnitude_scale,
+    -latitude,
+    -longitude,
+    -river_basin,
+    -Reconstruction.Costs,
+    -Reconstruction.Costs.Adjusted,
+    -Insured.Damages,
+    -Insured.Damages.Adjusted,
+    -cpi,
+    -admin_units,
+    -imp_credate,
+    -imp_moddate,
+    -imp_unitdate,
+    -haz_type,
+    -haz_cluster,
+    -haz_spec,
+    -hazlink,
+    -haz_potlink,
+    -classif_key,
+    -location
+  )
+  
 }
 
 # Directly extract the data from the EM-DAT API
