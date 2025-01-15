@@ -15,6 +15,8 @@ GetSourceFiles<-function(){
   source(paste0(directory,'RCode/Data_Wrangling/GetDesinventar.R'))
   source(paste0(directory,'RCode/Data_Wrangling/GetEMDAT.R'))
   source(paste0(directory,'RCode/Data_Wrangling/GetGIDD.R'))
+  # Food and agriculture related:
+  source(paste0(directory,'RCode/Data_Wrangling/GetFAOSTAT.R'))
 }
 
 LoadLibraries<-function(){
