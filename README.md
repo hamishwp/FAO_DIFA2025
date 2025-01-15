@@ -4,7 +4,7 @@ Welcome to the GitHub repository for the DIFA Report for the United Nations Food
 ## Developers
 This modelling was developed by:
 - Priti Rajagopalan
-- Nina
+- Nina Deliu
 - Ignacio Acosta
 - Hamish Patten
 
