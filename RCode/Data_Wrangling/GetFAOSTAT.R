@@ -9,8 +9,26 @@ GetFAOSTAT<-function(syear=1990,fyear=NULL){
   download.file(URL,outloc)
   # Unzip it
   unzip(outloc,exdir = str_split(outloc,".zip",simplify = T)[1,1])
+  
   # Load the data
-  read.csv("./Data/RawData/FAOSTAT/Production_Crops_Livestock_E_All_Data.csv")
+  DATA <- read.csv("./Data/RawData/FAOSTAT/Production_Crops_Livestock_E_All_Data.csv")%>%
+    select(
+      -matches(
+        "F$|N$"
+        )
+      )%>%
+    pivot_longer(
+      cols = starts_with("Y"), 
+      names_to = "Year",   
+      values_to = "Value"  
+    )%>%
+    mutate(
+      Year = str_remove(Year, "^Y")
+      )
+  
+  CleanFAOSTAT(DATA)
+  
+
 }
 
 CleanFAOSTAT <- function(FAOSTAT){
@@ -169,21 +187,22 @@ CleanFAOSTAT <- function(FAOSTAT){
       Yield = case_when(
         Unit == "hg/ha" | Unit == "hg/An" | Unit == "100 g/An" | Unit == "100 g/ha" ~ Value*0.0001,
         Unit == "0.1g/An" | Unit == "100mg/An" ~ Value*0.0000001,
+        Unit == "kg/ha" ~ Value * 0.001,
         TRUE ~ Value
       )
     )%>%
     select(
-      ISO3_CODE,
+      ISO3.CODE,
       Item,
       Year,
       Yield
     )%>%
     arrange(
-      ISO3_CODE,
+      ISO3.CODE,
       Year,
       Item
     )
   
-  
+
   
 }
