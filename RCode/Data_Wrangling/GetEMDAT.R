@@ -127,7 +127,7 @@ API_EMDAT<-function(yr=NULL){
       public_emdat(
         cursor: {limit: -1}
         filters: {
-          from: 1900,
+          from: 1990,
           to: ####,
           classif: ["nat-*"],
           include_hist: true
