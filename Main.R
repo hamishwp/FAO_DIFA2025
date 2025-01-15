@@ -4,6 +4,10 @@
 # - Nina
 # - Ignacio Acosta
 # - Hamish Patten
+
+# Load the packages & default functions
+source("./RCode/Setup/GetPackages.R")
+source("./RCode/Setup/Functions.R")
   
 # Main function
 execDIFA<-function(){
