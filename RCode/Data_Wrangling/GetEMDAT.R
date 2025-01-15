@@ -119,7 +119,7 @@ CleanEMDAT_API<-function(EMDAT){
 # Directly extract the data from the EM-DAT API
 API_EMDAT<-function(syear=1990,fyear=NULL){
   # Set the upper limit for the year
-  if(is.null(syear)) syear<-AsYear(Sys.Date())
+  if(is.null(syear)) fyear<-AsYear(Sys.Date())
   
   query_str = 
     'query monty {
