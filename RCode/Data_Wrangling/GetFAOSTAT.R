@@ -41,21 +41,9 @@ GetFAOSTAT_Prod<-function(syear=1990,fyear=NULL){
 
 }
 
-GetFAOSTAT_Price<-function(syear=1990,fyear=NULL){
-  # Set the upper limit for the year
-  if(is.null(fyear)) fyear<-AsYear(Sys.Date())
-  # FAOSTAT data extract link
-  URL<-"https://bulks-faostat.fao.org/production/Prices_E_All_Data.zip"
-  # Where to store it to
-  outloc<-"./Data/RawData/FAOSTAT_PRICES.zip"
-  # Download it and save it out
-  download.file(URL,outloc)
-  # Unzip it
-  unzip(outloc,exdir = str_split(outloc,".zip",simplify = T)[1,1])
-  
-  
-  ######## CPI USD
-  
+GetCPI_USA <- function(syear=1990,fyear=NULL){
+ 
+   ######## CPI USD
   WB_cpi.lst <- getWDItoSYB(
     indicator = "FP.CPI.TOTL", 
     name = "FP.CPI.TOTL"
@@ -88,6 +76,23 @@ GetFAOSTAT_Price<-function(syear=1990,fyear=NULL){
     select(
       -CPI_2010
     )
+  
+  return(CPI_CONV)
+}
+
+GetFAOSTAT_Price<-function(syear=1990,fyear=NULL){
+  # Set the upper limit for the year
+  if(is.null(fyear)) fyear<-AsYear(Sys.Date())
+  # FAOSTAT data extract link
+  URL<-"https://bulks-faostat.fao.org/production/Prices_E_All_Data.zip"
+  # Where to store it to
+  outloc<-"./Data/RawData/FAOSTAT_PRICES.zip"
+  # Download it and save it out
+  download.file(URL,outloc)
+  # Unzip it
+  unzip(outloc,exdir = str_split(outloc,".zip",simplify = T)[1,1])
+  
+  CPI_CONV <- GetCPI_USA(syear,fyear)
   
   PRICES <- read.csv("./Data/RawData/FAOSTAT_PRICES/Prices_E_All_Data.csv")%>%
     select(
