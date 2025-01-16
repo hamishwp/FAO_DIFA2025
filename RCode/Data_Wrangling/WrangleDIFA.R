@@ -11,11 +11,12 @@ getData<-function(syear=1990,fyear=2024){
   # Disasters (currently EM-DAT only) 
   dissie<-GetDisaster(syear=syear,fyear=fyear)
   # Get yield from FAOSTAT
-  faostat<-GetFAOSTAT(syear=syear,fyear=fyear)
+  faostat<-GetFAOSTAT_All(syear=syear,fyear=fyear)
   # Get the USDA data
-  usda<-GetUSDA(syear=syear,fyear=fyear)
+  # usda<-GetUSDA(syear=syear,fyear=fyear)
   
-  return(list(dissie=dissie,faostat=faostat,usda=usda))
+  # return(list(dissie=dissie,faostat=faostat,usda=usda))
+  return(list(dissie=dissie,faostat=faostat))
 }
 
 # Merge the data
