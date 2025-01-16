@@ -2,7 +2,10 @@ GetFAOSTAT_All<-function(syear=1990,fyear=NULL){
   # Set the upper limit for the year
   if(is.null(fyear)) fyear<-AsYear(Sys.Date())
   # Production & prices
-  return(list(prod=GetFAOSTAT_Prod(syear=syear,fyear=fyear),
+  FAOSTAT <- GetFAOSTAT_Prod(syear=syear,fyear=fyear)
+  
+  return(list(yield = FAOSTAT$yield_data,
+              prod = FAOSTAT$prod_data,
               price=GetFAOSTAT_Price(syear=syear,fyear=fyear)))
 }
 
@@ -50,6 +53,42 @@ GetFAOSTAT_Price<-function(syear=1990,fyear=NULL){
   # Unzip it
   unzip(outloc,exdir = str_split(outloc,".zip",simplify = T)[1,1])
   
+  
+  ######## CPI USD
+  
+  WB_cpi.lst <- getWDItoSYB(
+    indicator = "FP.CPI.TOTL", 
+    name = "FP.CPI.TOTL"
+  )["entity"]%>%
+    as.data.frame()%>%
+    filter(
+      entity.ISO2_WB_CODE == "US"
+    )%>%
+    select(
+      -entity.ISO2_WB_CODE,
+      -entity.Country
+    )%>%
+    rename(
+      Year = entity.Year,
+      CPI_2010 = entity.FP.CPI.TOTL
+    )
+  
+  CPI_2017_CF <- WB_cpi.lst%>%
+    filter(
+      Year == 2017
+    )%>%
+    pull(
+      CPI_2010
+    )
+  
+  CPI_CONV <- WB_cpi.lst%>%
+    mutate(
+      CPI_2017 = CPI_2010/CPI_2017_CF
+    )%>%
+    select(
+      -CPI_2010
+    )
+  
   PRICES <- read.csv("./Data/RawData/FAOSTAT_PRICES/Prices_E_All_Data.csv")%>%
     select(
       -matches(
@@ -62,7 +101,17 @@ GetFAOSTAT_Price<-function(syear=1990,fyear=NULL){
       values_to = "Value"  
     )%>%
     mutate(
-      Year = str_remove(Year, "^Y")
+      Year = as.numeric(str_remove(Year, "^Y"))
+    )%>%
+    filter(
+      Element == "Producer Price (USD/tonne)"
+    )%>%
+    left_join(
+      CPI_CONV,
+      by = "Year"
+    )%>%
+    mutate(
+      Price17eq = Value/CPI_2017
     )
 }
 
@@ -270,5 +319,6 @@ CleanFAOSTAT <- function(FAOSTAT){
       Year,
       Item
     )
-  
+
+  return(list(yield_data = YIELD, prod_data = MF))
 }
