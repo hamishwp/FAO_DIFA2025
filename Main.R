@@ -20,7 +20,7 @@ execDIFA<-function(){
   # Add economic losses
   cntfcts%<>%addEconomics()
   # Null hypothesis testing
-  nullies<-nullhyp(cntfcts)
+  nullies<-nullhyp(cntfcts$prod, difaDF$prod)
   
   return(list(difaDF=difaDF,
               mGPR=mGPR,
