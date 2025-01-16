@@ -39,5 +39,3 @@ GET_WB_INCOME <- function(syear=1990, fyear=NULL){
   
   return(WB_INCOME)
 }
-
-Income <- GET_WB_INCOME()
