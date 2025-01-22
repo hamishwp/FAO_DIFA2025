@@ -1,3 +1,99 @@
+
+# A function to analyse some of the Desinventar crop data
+   # crops<-readRDS("../../IFRC/Monty-IFRC/API/data/MontyAPI_tab.RData")
+   # # tmp<-parallel::mclapply(crops$imp_lv$event_ID,function(ev){
+   # #              paste0(crops$haz_lv$haz_Ab[crops$haz_lv$event_ID==ev],collapse = ",")
+   # # },mc.cores = 8)
+   # crops$imp_lv%<>%left_join(crops$haz_lv[,c("haz_Ab","haz_spec_code","haz_sub_ID")],by="haz_sub_ID")
+   # impies<-crops
+   # crops<-crops$imp_lv
+   # crops%<>%filter(!is.na(haz_Ab))
+   # crops%<>%mutate(haz_Ab = case_when(haz_Ab=="TS" ~"SS", haz_Ab=="AV"~"LS", haz_Ab=="FL:AV:FF" ~"LS", haz_Ab=="FL:FF" ~"FL",haz_Ab=="FL:FF:FF" ~"FL",haz_Ab=="FL:FF:SS"~"SS",haz_Ab=="FL:FF:LS_HM" ~"LS",haz_Ab=="FL:FF:ST" ~"ST",haz_Ab=="FL:FF:ST:FF" ~"ST",haz_Ab=="FL:FF:TC:FF" ~"TC",haz_Ab=="FL:LS_HM:FF" ~"LS",haz_Ab=="FL:SS:FF" ~"SS",haz_Ab=="FL:SS:SS:FF" ~"SS",haz_Ab=="FL:ST:FF" ~"ST",haz_Ab=="FL:ST:FF:SS" ~"ST",haz_Ab=="FL:TC:FF" ~"TC",haz_Ab=="FL:TS:FF" ~"TS", T~haz_Ab))
+CropDamDataAnalysis<-function(impacts){
+  
+  p<-impacts%>%filter(haz_Ab%in%c("DR","FL","TC","ST","EQ","WF"))%>%
+    ggplot()+geom_point(aes(damages_in_crops_ha,deaths,colour=haz_Ab))+
+    ggtitle("Correlation deaths and crops [Ha]")+
+    scale_y_log10()+scale_x_log10()+facet_wrap(~haz_Ab);p
+  ggsave("deathsvscrops.png",p,path="./Plots/", height=6,width=12)
+  
+  p<-impacts%>%filter(haz_Ab%in%c("DR","FL","TC","ST","EQ","WF"))%>%
+    ggplot()+geom_point(aes(damages_in_crops_ha,losses_in_dollar,colour=haz_Ab))+
+    ggtitle("Correlation economic loss [USD] and crops [Ha]")+
+    scale_y_log10()+scale_x_log10()+facet_wrap(~haz_Ab);p
+  ggsave("lossesvscrops.png",p,path="./Plots/", height=6,width=12)
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  # Issues with the corrupt post-processing of the Desinventar data in Monty
+  
+  # # General overview
+  # p<-crops%>%mutate(yeardiff=as.numeric(as.Date(imp_fdate)-as.Date(imp_sdate))/365)%>%
+  #   ggplot()+geom_boxplot(aes(haz_Ab,yeardiff,fill=haz_Ab)) +
+  #   xlab("Hazard Type") + ylab("Duration [Years]") +
+  #   ggtitle("Hazard Duration in Desinventar"); p
+  # # Save it
+  # ggsave("EvDuration_CropDamHazEvs_ISO.png",p,path="./Plots/",width=8,height=6)
+  # # Country-wise percentage of events
+  # p<-crops%>%
+  #   group_by(imp_ISO3,haz_Ab)%>%
+  #   reframe(Count=n())%>%ungroup()%>%
+  #   group_by(imp_ISO3)%>%mutate(Percentage=100*Count/sum(Count))%>%
+  #   ggplot()+geom_boxplot(aes(haz_Ab,y=Percentage,fill=haz_Ab)) +
+  #   xlab("Hazard Type") + ylab("Percentage") + 
+  #   ggtitle("Boxplot of Percentage of Events per Country per Hazard"); p
+  # # Save it
+  # ggsave("PercCropDamHazEvs_ISO.png",p,path="./Plots/",width=8,height=6)
+  # # Percentage of crop losses
+  # p<-crops%>%
+  #   group_by(imp_ISO3,haz_Ab)%>%
+  #   reframe(Count=exp(sum(log(imp_value),na.rm = T)))%>%ungroup()%>%
+  #   group_by(imp_ISO3)%>%mutate(Percentage=100*Count/sum(Count))%>%
+  #   ggplot()+geom_boxplot(aes(haz_Ab,y=Percentage,fill=haz_Ab)) + 
+  #   xlab("Hazard Type") + ylab("Percentage") + 
+  #   ggtitle("Boxplot of Percentage of Crop Damage per Country per Hazard"); p
+  # # Save it
+  # ggsave("PercCropDamHazLoss_ISO.png",p,path="./Plots/",width=8,height=6)
+  # # Now in terms of crop losses in hectares
+  # p<-crops%>%filter(imp_value>0)%>%
+  #   group_by(imp_ISO3)%>%mutate(ranger=as.numeric(max(as.Date(imp_fdate))-min(as.Date(imp_sdate)))/365)%>%
+  #   group_by(imp_ISO3,haz_Ab)%>%
+  #   reframe(Count=sum(log(imp_value),na.rm = T)/ranger)%>%
+  #   ggplot()+geom_boxplot(aes(haz_Ab,y=Count,fill=haz_Ab)) + scale_y_log10() +
+  #   xlab("Hazard Type") + ylab("Avg. Yearly Crop Damage [Ha]") + 
+  #   ggtitle("Boxplot of Average Yearly Total Crop Damages [Ha] per Country per Hazard"); p
+  # # Save it
+  # ggsave("HaCropDamHazLoss_ISO.png",p,path="./Plots/",width=8,height=6)
+  
+  # Now let's look at the correlation between crop losses, deaths, building damage and cost
+  # imptab<-impies$imp_lv%>%#filter(event_ID%in%crops$event_ID & !is.na(imp_value) & imp_value>0)%>%
+  #   dplyr::select(event_ID,imp_sub_ID,imp_value,exp_spec_code)%>%
+  #   pivot_wider(names_from = exp_spec_code, values_from = imp_value, values_fill = NA_real_)
+  # imptab<-do.call(rbind,lapply(unique(crops$event_ID),function(ev){
+  #   tmp<-impies$imp_lv[impies$imp_lv$event_ID==ev,]
+  #   return(data.frame(crops=max(tmp$imp_value[tmp$exp_spec_code=="expspec_crop"], na.rm = T),
+  #              deaths=max(tmp$imp_value[tmp$imp_type_code=="imptypdeat"], na.rm = T),
+  #              cost=max(tmp$imp_value[tmp$imp_unit_code=="unitISO4217C-USD"], na.rm = T),
+  #              affected=max(tmp$imp_value[tmp$imp_type_code=="imptypindaffe" | tmp$imp_type_code=="imptypdiraffe" | tmp$imp_type_code=="imptypaffe"], na.rm = T),
+  #              homeless=max(tmp$imp_value[tmp$imp_type_code=="imptyphomles"], na.rm = T),
+  #              buildings=max(tmp$imp_value[tmp$exp_spec_code=="expspec_build"], na.rm = T)))
+  # })); imptab[sapply(imptab, is.infinite)] <- NA_real_
+  # # 
+  # imptab%>%
+  #   group_by(event_ID)%>%
+  #   cor(use = "complete.obs")%>%
+  #   corrplot::corrplot(method = "circle", type = "upper", tl.col = "black", tl.srt = 45)
+  # Do the same, but extract the correlation coefficient and then plot it per hazard type and exposure type
+  
+}
+
 GetDessieISOs<-function(){
   DesIsos<-data.frame(isos=
                         c("ago", "alb", "arg", "arm", "atg", "bfa", "bdi", "blr", "blz", "bol", 
@@ -483,7 +579,7 @@ WrangleDessie<-function(iso3,forcer=T){
 
 DesHazards<-function(Dessie){
   # Extract the list of translated Desinventar hazards
-  colConv<-openxlsx::read.xlsx("./Taxonomies/ConvertFromDatabases/Desinventar_HIP.xlsx")
+  colConv<-openxlsx::read.xlsx("./Data/Taxonomies/Desinventar_HIP.xlsx")
   # Make sure to avoid missing out!
   colConv$event%<>%str_to_lower()
   # Also check for duplicates
