@@ -1,0 +1,165 @@
+---
+title: Disaster Severity
+subtitle: "Hamish Patten \& Ignacio Costa"
+output:
+  prettydoc::html_pretty:
+    theme: architect
+    highlight: github
+    css: styles.css
+---
+
+<style type="text/css">
+h1.title {
+  font-size: 50px;
+  color: White;
+}
+h3.subtitle {
+  font-size: 20px;
+  color: White;
+}
+<!-- .table-hover > tbody > tr:hover { -->
+<!--   background-color: #f7f7e6; -->
+<!-- } -->
+.main-container {
+  width: 95%;
+    <!-- max-width: unset; -->
+  }
+</style>
+
+<div style= "position:relative">
+<!-- <div style= "float:left; position:relative; top:-100px;margin-bottom:-100px;margin-left:-10px;"> -->
+
+```{r setup, include=FALSE}
+# Setup the local environment
+source("./RCode/Setup/Functions.R")
+# Some extras for nice and neat tables
+knitr::opts_chunk$set(echo = TRUE)
+options(kableExtra.latex.load_packages = FALSE,
+        knitr.kable.NA = '')
+# Read in the Desinventar data
+dessie <- readRDS("Dessie.RData")
+# Labels for the hazard codes
+haz_Ab_lab<-c("AV"="Avalanche",
+              "CW"="Cold Wave",
+              "DR"="Drought",
+              "EQ"="Earthquake",
+              "EP"="Epidemic",
+              "ER"="Erosion",
+              "EC"="Extra-Tropical Cyclone",
+              "ET"="Extreme Temperature",
+              "FR"="Fire",
+              "FF"="Flash Flood",
+              "FL"="Flood",
+              "HW"="Heat Wave",
+              "HT"="High Temperature",
+              "IN"="Insect Infestation",
+              "LS"="Landslide",
+              "MM"="Mass Movement",
+              "MS"="Mudslide",
+              "SL"="Slide",
+              "SN"="Snowfall",
+              "ST"="Storm",
+              "SS"="Storm Surge",
+              "TO"="Tornado",
+              "TC"="Tropical Cyclone",
+              "TS"="Tsunami",
+              "WF"="Wildfire",
+              "VW"="Violent Wind",
+              "VO"="Volcanic Activity",
+              "WV"="Wave",
+              "WA"="Wave Action")
+# Convert ISO3Cs to continent
+convIso3Continent<-function(iso3){
+  continents<-countrycode::countrycode(sourcevar = iso3,
+                                       origin = "iso3c",
+                                       destination = "continent",warn = F)
+}
+```
+
+</div>
+
+## Desinventar Data
+
+The DesInventar database is a comprehensive disaster information system designed to systematically document and analyse the impacts of natural hazards at the subnational level. Developed by the United Nations Office for Disaster Risk Reduction (UNDRR) and other partners, it provides historical records of disasters across many different countries around the world. Each country, territory or country cluster present in Desinventar is responsible for curating, producing and managing disaster impact records, thus governments are the database custodians. The database is built on standardised methodologies, ensuring comparability of disaster impacts across time and regions. Its primary objective is to support disaster risk management, policy development, and research by offering granular, locally reported data on the effects of natural hazards on communities, infrastructure, and livelihoods. By systematically collecting and organising these diverse impact types, DesInventar serves as a valuable tool for disaster risk reduction planning and the implementation of frameworks such as the Sendai Framework for Disaster Risk Reduction and the Sustainable Development Goals (SDGs). It enables policymakers and researchers to identify trends, assess vulnerabilities, and design more effective strategies for resilience-building. DesInventar categorises disaster impacts into multiple dimensions, capturing both direct and indirect consequences. The data includes human impacts, such as the number of fatalities and injured persons. It also records economic losses, damage to built environment and productive sectors. It provides measures of agricultural impacts in the form of crop losses in hectares and livestock losses, which are critical for understanding food security risks. 
+
+The Desinventar impact database is the only database to contain historical estimates of crop and livestock loss and damage across the globe. Please note that only 93 countries, territories and country clusters are present in the Desinventar databases, with almost all of these countries having ceased to update their national databases with new records since roughly 2016. The Desinventar data is integrated into this work because it can be used to estimate the correlations between different impact types when another impact type is not present: to correlate crop losses with economic costs or deaths, for example. However, care must be taken in order to adjust for bias that can be present across countries, continents, hazard types, impact types and time-periods.
+
+## Ignacio Support
+
+Ignacio, please will you analyse the Desinventar data via the following plots?
+
+### Bias Analysis
+
+We need to analyse bias in the data, so let's check out the following:
+
+* Table of number of Desinventar records with crop losses per country
+* Barplot of number of Desinventar records with crop losses per UN subregion (from the IsoContinentRegion.xlsx file in the taxonomies data folder - this requires using left_join by the ISO codes and please note all of the countries that were not successfully merged and please add them to the IsoContinentRegion file)
+* Barplot of number of Desinventar records with crop losses per hazard type (use haz_Ab)
+* Point plot of number of Desinventar records with crop losses in time
+
+### Intra-Impact Correlations
+
+Now we need to analyse the correlation between different impact types, grouping them wherever possible to ensure sufficient sample sizes. When plotting economic losses, please plot the impact estimated in USD and not the local/unknown currency.
+
+* Point plot of crop losses against: deaths, economic losses, directly affected, indirectly affected, injured and missing
+* Point plot of crop losses against economic losses by disaster type (using haz_Ab)
+* Point plot of crop losses against economic losses by  UN regions
+* Table of adj-R-squared values of all impact types against crop losses by disaster type (using haz_Ab), include sample size
+* Table of adj-R-squared values of all impact types against crop losses by UN region, include sample size
+* Re-group certain hazards based on differences and then make a table of adj-R-squared values of all impact types against crop losses by grouped disaster types, include sample size
+* Normalise the crop losses in the Desinventar database with the productive cropland area from FAOSTAT, then re-calculate the hazard type (using haz_Ab) adj-R-squared values, make table
+* Same as above but with grouped-hazard types, trying different grouping methods
+* Now normalise by country area instead of cropland area (country area can be extracted from the World Bank database and then left_joined to the IsoContinentRegion file), as well as normalising each impact type by their obvious variable (e.g. deaths by country population, economic cost by GDP, both of which can be extracted from the World Bank database) and recalculate the hazard type adj-R-squared values, make table
+* (Not sure about this one) Re-weight, using three progressive levels of scale of the weighting, every record such that countries that record more disasters with crop losses are given less weight, then recalculate the adj-R-squared values
+
+### Disaster Severity Models
+
+Let's try out some different models! For this first model attempt we only need point estimates, but in future we should include uncertainty and covariates into the model (e.g. UN subregion or hazard type). Please train the following models:
+* K-Nearest Neighbour model for point estimates, include some covariates such as grouped hazard type based on the previous findings
+* GPR, ensuring that the model also spits out uncertainty values
+* Quantile Regression Forests? Might be worth a try.
+
+
+<br><br>
+
+Examples of plots and tables in RMarkdown:
+
+```{r haz_Ab, message=FALSE,warning=FALSE, echo=FALSE}
+
+table(dessie$haz_Ab)%>%as.data.frame()%>%
+  arrange(desc(Freq))%>%
+kable(col.names = c("Abbreviated Hazard","Number of Records"))
+
+```
+
+<br><br>
+
+```{r isos, message=FALSE,warning=FALSE, echo=FALSE}
+
+table(dessie$ISO3)%>%as.data.frame()%>%
+  arrange(desc(Freq))%>%
+kable(col.names = c("Country/Cluster ISO","Number of Records"))
+
+```
+
+<br><br>
+
+
+
+```{r plots, message=FALSE,warning=FALSE, echo=FALSE}
+
+p<-dessie%>%filter(haz_Ab%in%c("DR","FL","TC","ST","EQ","WF"))%>%
+    ggplot()+geom_point(aes(damages_in_crops_ha,deaths,colour=haz_Ab))+
+    ggtitle("Correlation deaths and crops [Ha]")+
+    scale_y_log10()+scale_x_log10()+facet_wrap(~haz_Ab)
+  
+q<-dessie%>%filter(haz_Ab%in%c("DR","FL","TC","ST","EQ","WF"))%>%
+    ggplot()+geom_point(aes(damages_in_crops_ha,losses_in_dollar,colour=haz_Ab))+
+    ggtitle("Correlation economic loss [USD] and crops [Ha]")+
+    scale_y_log10()+scale_x_log10()+facet_wrap(~haz_Ab)
+
+gridExtra::grid.arrange(p,q, ncol=2)
+
+```
+
+<br><br>
