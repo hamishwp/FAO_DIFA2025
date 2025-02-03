@@ -186,7 +186,8 @@ DesCols<-c('serial'='ext_ID',
            'duracion'='duration',
            'fechano'= 'year',
            'fechames'= 'month',
-           'fechadia'= 'day')
+           'fechadia'= 'day',
+           'ISO3'='ISO3')
 
 RegCols<-c("codregion"="ADMcode",
            "nivel"="ADMlevel",

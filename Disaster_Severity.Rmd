@@ -1,6 +1,6 @@
 ---
-title: Disaster Severity
-subtitle: "Hamish Patten \& Ignacio Costa"
+title: "Disaster Severity"
+subtitle: "Hamish Patten and Ignacio Costa"
 output:
   prettydoc::html_pretty:
     theme: architect
@@ -30,6 +30,16 @@ h3.subtitle {
 <!-- <div style= "float:left; position:relative; top:-100px;margin-bottom:-100px;margin-left:-10px;"> -->
 
 ```{r setup, include=FALSE}
+library(dplyr)
+library(magrittr)
+library(tidyverse)
+library(kableExtra)
+library(knitr)
+library(prettydoc)
+library(rmdformats)
+library(caret)
+library(parallel)
+library(doParallel)
 # Setup the local environment
 source("./RCode/Setup/Functions.R")
 # Some extras for nice and neat tables
@@ -37,7 +47,13 @@ knitr::opts_chunk$set(echo = TRUE)
 options(kableExtra.latex.load_packages = FALSE,
         knitr.kable.NA = '')
 # Read in the Desinventar data
-dessie <- readRDS("Dessie.RData")
+if(file.exists("./Data/RawData/Desinventar.RData")){
+  dessie <- readRDS("./Data/RawData/Desinventar.RData")
+} else {
+  stop("Please download the pre-processed Desinventar data from https://unfao-my.sharepoint.com/:u:/g/personal/hamish_patten_fao_org/EcG--VZWS3RBnzLKL7lcm9IBjmVVYHhr3qpJQr8FjtIxCA?e=7Cxa1v")
+}
+# Extract the crop-only losses into a new dataframe
+croppies<-dessie%<>%filter(!is.na(damages_in_crops_ha))
 # Labels for the hazard codes
 haz_Ab_lab<-c("AV"="Avalanche",
               "CW"="Cold Wave",
