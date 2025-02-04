@@ -98,10 +98,10 @@ Ignacio, please will you analyse the Desinventar data via the following plots?
 
 We need to analyse bias in the data, so let's check out the following:
 
-* Table of number of Desinventar records with crop losses per country
-* Barplot of number of Desinventar records with crop losses per UN subregion (from the IsoContinentRegion.xlsx file in the taxonomies data folder - this requires using left_join by the ISO codes and please note all of the countries that were not successfully merged and please add them to the IsoContinentRegion file)
-* Barplot of number of Desinventar records with crop losses per hazard type (use haz_Ab)
-* Point plot of number of Desinventar records with crop losses in time
+* Table of number of Desinventar records with crop and cattle losses per country (thus three columns)
+* Barplot of number of Desinventar records with crop and cattle losses (1 plot for crops 1 for cattle) per UN subregion (from the IsoContinentRegion.xlsx file in the taxonomies data folder - this requires using left_join by the ISO codes and please note all of the countries that were not successfully merged and please add them to the IsoContinentRegion file)
+* Barplot of number of Desinventar records with crop and cattle losses per hazard type (use haz_Ab)
+* Point plot of number of Desinventar records with crop and cattle losses in time
 
 ### Intra-Impact Correlations
 
@@ -112,6 +112,7 @@ Now we need to analyse the correlation between different impact types, grouping 
 * Point plot of crop losses against economic losses by  UN regions
 * Table of adj-R-squared values of all impact types against crop losses by disaster type (using haz_Ab), include sample size
 * Table of adj-R-squared values of all impact types against crop losses by UN region, include sample size
+* All of the above but for cattle losses instead of crop losses
 * Re-group certain hazards based on differences and then make a table of adj-R-squared values of all impact types against crop losses by grouped disaster types, include sample size
 * Normalise the crop losses in the Desinventar database with the productive cropland area from FAOSTAT, then re-calculate the hazard type (using haz_Ab) adj-R-squared values, make table
 * Same as above but with grouped-hazard types, trying different grouping methods
