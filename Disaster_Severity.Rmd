@@ -117,14 +117,15 @@ Now we need to analyse the correlation between different impact types, grouping 
 * Same as above but with grouped-hazard types, trying different grouping methods
 * Now normalise by country area instead of cropland area (country area can be extracted from the World Bank database and then left_joined to the IsoContinentRegion file), as well as normalising each impact type by their obvious variable (e.g. deaths by country population, economic cost by GDP, both of which can be extracted from the World Bank database) and recalculate the hazard type adj-R-squared values, make table
 * (Not sure about this one) Re-weight, using three progressive levels of scale of the weighting, every record such that countries that record more disasters with crop losses are given less weight, then recalculate the adj-R-squared values
+* Try many formulations of the above but for quantiles instead of the actual impact value
 
 ### Disaster Severity Models
 
-Let's try out some different models! For this first model attempt we only need point estimates, but in future we should include uncertainty and covariates into the model (e.g. UN subregion or hazard type). Please train the following models:
-* K-Nearest Neighbour model for point estimates, include some covariates such as grouped hazard type based on the previous findings
+Let's try out modelling this! For this first model attempt we only need point estimates, but in future we should include uncertainty and covariates into the model (e.g. UN subregion or hazard type).
+* Linear and log-linear model for things like economic cost and affected persons and maybe a negative binomial for deaths? Deaths is the hard one...
+* Try converting from impact values into quantile-space, then fitting models such as multivariate normal on deaths, economic losses and others?
+* Try out mixtures of linear, log-linear, quantile-linear and multivariate quantile models
 * GPR, ensuring that the model also spits out uncertainty values
-* Quantile Regression Forests? Might be worth a try.
-
 
 <br><br>
 
