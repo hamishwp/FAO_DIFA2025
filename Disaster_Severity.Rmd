@@ -30,18 +30,8 @@ h3.subtitle {
 <!-- <div style= "float:left; position:relative; top:-100px;margin-bottom:-100px;margin-left:-10px;"> -->
 
 ```{r setup, include=FALSE}
-library(dplyr)
-library(magrittr)
-library(tidyverse)
-library(kableExtra)
-library(knitr)
-library(prettydoc)
-library(rmdformats)
-library(caret)
-library(parallel)
-library(doParallel)
 # Setup the local environment
-source("./RCode/Setup/Functions.R")
+source("./RCode/Setup/GetPackages.R")
 # Some extras for nice and neat tables
 knitr::opts_chunk$set(echo = TRUE)
 options(kableExtra.latex.load_packages = FALSE,
@@ -144,7 +134,7 @@ Examples of plots and tables in RMarkdown:
 
 table(dessie$haz_Ab)%>%as.data.frame()%>%
   arrange(desc(Freq))%>%
-kable(col.names = c("Abbreviated Hazard","Number of Records"))
+kableExtra::kable(col.names = c("Abbreviated Hazard","Number of Records"))
 
 ```
 
@@ -154,7 +144,7 @@ kable(col.names = c("Abbreviated Hazard","Number of Records"))
 
 table(dessie$ISO3)%>%as.data.frame()%>%
   arrange(desc(Freq))%>%
-kable(col.names = c("Country/Cluster ISO","Number of Records"))
+kableExtra::kable(col.names = c("Country/Cluster ISO","Number of Records"))
 
 ```
 
