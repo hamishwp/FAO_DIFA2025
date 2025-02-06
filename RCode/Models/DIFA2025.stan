@@ -86,7 +86,7 @@ model {
        } 
      }
      // Set the GPR mean function
-     mu[ttt] = betad * dsev * (1 + csev[iso]) + lin[iso] * time[ttt];;
+     mu[ttt] = betad * dsev * (1 + csev[iso]) + lin[iso] * ttt;
    }
    // Sample the commodity data!
    y[iso,] ~ multi_normal_cholesky(mu, L_K);
