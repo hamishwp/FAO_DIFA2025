@@ -61,8 +61,7 @@ model {
  // Per country, sample from the model!
  for(iso in 1:n_isos){
    // GPR Covariance matrix
-   matrix[n_t, n_t] K = gp_exp_quad_cov(time, alpha[iso], rho[iso]) + 
-                        diag_matrix(rep_vector(sq_sigma[iso], n_t));
+   matrix[n_t, n_t] K = add_diag(gp_exp_quad_cov(time, alpha[iso], rho[iso]), sq_sigma[iso]);
    // Decompose the GPR covariance matrix
    matrix[n_t, n_t] L_K = cholesky_decompose(K);
    // Set the GPR mean function to zero
