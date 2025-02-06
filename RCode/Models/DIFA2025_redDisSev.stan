@@ -8,12 +8,12 @@ data {
   // Data dimensions
   int<lower=1> n_t; // Number of years
   int<lower=1> n_isos; // Number of countries
-  int<lower=1> n_dis[n_isos]; // Number of disasters, per country
+  array[n_isos] int<lower=1> n_dis; // Number of disasters, per country
   int<lower=1> n_haz; // Number of hazard types
   // Time series data - EOY
-  vector[n_t] real time;
+  array[n_t] real time;
   // Commodity data
-  matrix[n_isos,n_t] real y;
+  matrix[n_isos,n_t] y;
   // Flag to ensure disasters do not contribute to years previous to the disaster occurrence
   array[n_isos, n_t, max(n_dis)] int <lower = 0, upper = 1> flag;
   // Duration of the hazard during year ttt
@@ -23,9 +23,9 @@ data {
   // Expected value of disaster severity, per disaster
   array[n_isos, max(n_dis)] real<lower=0> iprox;
   // Mean AR1 trend in commodity data, per country
-  vector[n_isos] real mu_AR1;
+  vector[n_isos] mu_AR1;
   // Standard deviation in AR1 trend in commodity data, per country
-  vector[n_isos] real<lower=0> sig_AR1;
+  array[n_isos] real<lower=0> sig_AR1;
 }
 
 parameters {
@@ -44,6 +44,7 @@ parameters {
 transformed parameters {
   vector<lower=0>[n_isos] sq_sigma;
   sq_sigma = square(sigma[1:n_isos]);
+  real<lower=0> dsev;
 }
 
 model {
@@ -69,7 +70,7 @@ model {
    // Sample through the EOY values
    for(ttt in 1:n_t){
      // Set the disaster severity to zero at first, as well as the GPR mean function
-     real<lower=0> dsev = 0;
+     dsev = 0;
      // Sample the disaster impact type on crops and cattle losses
      for(i_dis in 1:n_dis[iso]){
        // Check if the disaster comes after or before this year.

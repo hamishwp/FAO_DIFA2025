@@ -114,9 +114,27 @@ data_list <- list(
   sig_AR1 = sig_AR1
 )
 
-# Print dataset structure to verify
-str(data_list)
-                        
+     
+library(rstan)
+
+# ----- Step 0: Prepare Stan Data -----
+# Assuming data_list from the previous script is already generated
+# Ensure that Stan runs properly with parallel computation enabled
+options(mc.cores = floor(0.8*parallel::detectCores()))
+rstan_options(auto_write = TRUE)
+
+# ----- Compile Stan Model -----
+stan_model_code <- "./RCode/Models/DIFA2025_redredDisSev.stan"  # Specify your Stan model path
+stan_model <- stan_model(stan_model_code)
+
+# ----- Optimization Step -----
+opt_results <- optimizing(
+  object = stan_model, 
+  data = data_list, 
+  verbose = TRUE
+)
+print(opt_results)
+print(opt_results$par)  # Optimised parameter estimates
 
 
 
@@ -124,11 +142,20 @@ str(data_list)
 
 
 
+# ----- MCMC Sampling -----
+mcmc_results <- sampling(
+  object = stan_model, 
+  data = data_list, 
+  chains = 4, 
+  iter = 2000, 
+  warmup = 1000, 
+  seed = 42,
+  control = list(adapt_delta = 0.95)
+)
+print(mcmc_results)
 
-
-
-
-
+# Plot MCMC diagnostics
+traceplot(mcmc_results, pars = c("beta_dis", "sigma", "rho"))
 
 
 
