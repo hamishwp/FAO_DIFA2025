@@ -1,5 +1,5 @@
 // NOTES
-// - if this works, then betad should be negative (betad is the disaster regression coefficient)
+// - if this works, then beta_dis should be negative (beta_dis is the disaster regression coefficient)
 // - duration must be in years, not days
 // - check conversion of array dimensions from R to stan: row-column or column-row?
 // - check whether normal(mu_dis[iso, 1:n_dis[iso]], sigma_dis[iso, 1:n_dis[iso]]) needs to be iterated over instead of the vector input
@@ -32,12 +32,13 @@ parameters {
   // Disaster parameters
   vector<lower=0>[n_haz] hsev; // Hazard severity, per hazard type
   vector[n_isos] csev; //  Country severity
-  real betad; // Disaster-severity regression coefficient
+  real beta_dis; // Disaster-severity regression coefficient
   // GPR covariance parameters
   vector<lower=0>[n_isos] rho; // GPR length-scale
   vector<lower=0>[n_isos] alpha; // GPR marginal standard-deviation
   vector<lower=0>[n_isos] sigma; // GPR regression-level noise scale
-  vector[n_isos] lin; // GPR linear mean function trend, per country
+  vector[n_isos] beta_lin; // GPR linear mean function trend, per country
+  vector[n_isos] beta_y1; // GPR AR1 mean function trend, per country
 }
 
 transformed parameters {
@@ -52,8 +53,9 @@ model {
  rho ~ gamma(2,2); // GPR length-scale
  alpha ~ gamma(2,1); // GPR marginal standard-deviation
  sigma ~ gamma(2,1); // GPR regression-level noise scale
- betad ~ normal(0,5); // Disaster-severity regression coefficient
- lin ~ normal(mu_lin, 2*sig_lin); // GPR linear mean function coefficient - empirical Bayes
+ beta_dis ~ normal(0,5); // Disaster-severity regression coefficient
+ beta_lin ~ normal(mu_lin, 2*sig_lin); // GPR linear mean function coefficient - empirical Bayes
+ beta_y1 ~ normal(0,5); // GPR AR1 mean function coefficient
  // GPR mean function
  vector[n_t] mu;
  // Per country, sample from the model!
@@ -76,11 +78,15 @@ model {
          // Save on computation
          real iphs = iprox[iso,i_dis] / hsev[htype[i_dis]]; 
          // Calculate the EOY disaster severity based on this disaster and add to total disaster severity for this EOY
-         dsev += iprox[iso,i_dis] * (duration[iso, ttt, i_dis] + iphs *(1-exp(-duration[iso, ttt, i_dis]/iphs)));
+         dsev += iprox[iso,i_dis]*(duration[iso, ttt, i_dis] + iphs*(1-exp(-duration[iso, ttt, i_dis]/iphs)));
        } 
      }
      // Set the GPR mean function
-     mu[ttt] = betad * dsev * (1 + csev[iso]) + lin[iso] * ttt;
+     if (ttt == 1) {
+        mu[ttt] = beta_dis*dsev*(1 + csev[iso]) + beta_lin[iso]*ttt;  // No past y available
+      } else {
+        mu[ttt] = beta_dis*dsev*(1 + csev[iso]) + beta_lin[iso]*ttt + beta_y1*y[iso, ttt-1]; // Auto-Regressive first order (AR1) model
+      }
    }
    // Sample the commodity data!
    y[iso,] ~ multi_normal_cholesky(mu, L_K);
