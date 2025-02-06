@@ -3,15 +3,16 @@ directory<-paste0(getwd(),"/")
 dir.create("./Data/RawData/",showWarnings = F)
 dir.create("./Plots",showWarnings = F)
 
+if(!file.exists(paste0(directory,'RCode/Setup/GetEnv.R'))) 
+  file.copy(paste0(directory,'RCode/Setup/GetEnv_Example.R'),
+            paste0(directory,'RCode/Setup/GetEnv.R'),overwrite = F)
+source(paste0(directory,'RCode/Setup/GetEnv.R'))
+
 GetSourceFiles<-function(){
   
   #@@@@@ SOURCE FILES @@@@@#
   # Basic functions:
   source(paste0(directory,'RCode/Setup/Functions.R'))
-  if(!file.exists(paste0(directory,'RCode/Setup/GetEnv.R'))) 
-    file.copy(paste0(directory,'RCode/Setup/GetEnv_Example.R'),
-              paste0(directory,'RCode/Setup/GetEnv.R'),overwrite = F)
-  source(paste0(directory,'RCode/Setup/GetEnv.R'))
   # Disaster related:
   source(paste0(directory,'RCode/Data_Wrangling/GetDesinventar.R'))
   source(paste0(directory,'RCode/Data_Wrangling/GetEMDAT.R'))
@@ -53,7 +54,7 @@ LoadLibraries<-function(){
   
 }
 
-GetPackages<-function(){
+GetPackages<-function(packred=T){
 
   list.of.packages <- c("devtools","dplyr", "ggplot2","tidyverse","magrittr","stringr",
                         "RColorBrewer", "reshape2","countrycode", 'doParallel', 'abind',
@@ -62,15 +63,17 @@ GetPackages<-function(){
   
   new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
   if(length(new.packages)>0) install.packages(new.packages, repos='http://cran.us.r-project.org')
-  
-  # if(length(list.of.packages[!("countrycodes" %in% installed.packages()[,"Package"])])){devtools::install_github("vincentarelbundock/countrycode")}
+  # Install stan and rstan if packred (from Setup/GetEnv.R) is not True
+  if(!packred) {
+    if(!("rstan" %in% installed.packages()[,"Package"])) install.packages("rstan", repos = c('https://stan-dev.r-universe.dev', getOption("repos")))
+  }
   
   LoadLibraries()
   GetSourceFiles()
   
 }
 
-GetPackages()
+GetPackages(packred)
 
 # # Check the structure of the repository
 # filers<-c(paste0(directory,"Plots"))

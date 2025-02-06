@@ -25,6 +25,10 @@ data {
   array[n_isos, n_dis] real<lower=0> alpha_dis;
   // (Gamma) Rate of disaster severity, per disaster
   array[n_isos, n_dis] real<lower=0> lambda_dis;
+  // Mean linear trend in commodity data, per country
+  vector[n_isos] real mu_lin;
+  // Standard deviation in linear trend in commodity data, per country
+  vector[n_isos] real<lower=0> sigma_lin;
 }
 
 parameters {
@@ -37,6 +41,7 @@ parameters {
   vector<lower=0>[n_isos] rho; // GPR length-scale
   vector<lower=0>[n_isos] alpha; // GPR marginal standard-deviation
   vector<lower=0>[n_isos] sigma; // GPR regression-level noise scale
+  vector[n_isos] lin; // GPR linear mean function trend, per country
 }
 
 transformed parameters {
@@ -52,6 +57,7 @@ model {
  alpha ~ gamma(2,1); // GPR marginal standard-deviation
  sigma ~ gamma(2,1); // GPR regression-level noise scale
  betad ~ normal(0,5); // Disaster-severity regression coefficient
+ lin ~ normal(mu_lin, 2*sig_lin); // GPR linear mean function coefficient - empirical Bayes
  // GPR mean function
  vector[n_t] mu;
  // Per country, sample from the model!
@@ -80,7 +86,7 @@ model {
        } 
      }
      // Set the GPR mean function
-     mu[ttt] = betad * dsev * (1 + csev[iso]);
+     mu[ttt] = betad * dsev * (1 + csev[iso]) + lin[iso] * time[ttt];;
    }
    // Sample the commodity data!
    y[iso,] ~ multi_normal_cholesky(mu, L_K);
