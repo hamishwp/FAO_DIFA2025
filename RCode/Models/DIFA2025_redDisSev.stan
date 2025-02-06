@@ -3,7 +3,6 @@
 // - duration must be in years, not days
 // - check conversion of array dimensions from R to stan: row-column or column-row?
 // - check whether normal(mu_dis[iso, 1:n_dis[iso]], sigma_dis[iso, 1:n_dis[iso]]) needs to be iterated over instead of the vector input
-// - alpha_dis and lambda_dis must have 0 and near 0 values, resp, for all array elements that do not have disasters in the iprox[n_isos,n_dis] array
 
 data {
   // Data dimensions
@@ -21,10 +20,8 @@ data {
   array[n_isos, n_t, max(n_dis)] real <lower = 0> duration;
   // Hazard type of the disaster
   array[max(n_dis)] int <lower = 0> htype;
-  // (Gamma) Shape value of disaster severity, per disaster
-  array[n_isos, n_dis] real<lower=0> alpha_dis;
-  // (Gamma) Rate of disaster severity, per disaster
-  array[n_isos, n_dis] real<lower=0> lambda_dis;
+  // Expected value of disaster severity, per disaster
+  array[n_isos, max(n_dis)] real<lower=0> iprox;
 }
 
 parameters {
@@ -32,7 +29,6 @@ parameters {
   vector<lower=0>[n_haz] hsev; // Hazard severity, per hazard type
   vector[n_isos] csev; //  Country severity
   real betad; // Disaster-severity regression coefficient
-  array[n_isos] vector<lower=0>[max(n_dis)] iprox; // Disaster-specific severity
   // GPR covariance parameters
   vector<lower=0>[n_isos] rho; // GPR length-scale
   vector<lower=0>[n_isos] alpha; // GPR marginal standard-deviation
@@ -63,8 +59,6 @@ model {
    matrix[n_t, n_t] L_K = cholesky_decompose(K);
    // Set the GPR mean function to zero
    mu = rep_vector(0, n_t);
-   // Sample the estimated impact value in crop losses = impact proxy
-   iprox[iso,] ~ gamma(alpha_dis[iso, 1:max(n_dis)], lambda_dis[iso, 1:max(n_dis)]);
    // Sample through the EOY values
    for(ttt in 1:n_t){
      // Set the disaster severity to zero at first, as well as the GPR mean function
