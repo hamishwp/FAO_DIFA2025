@@ -38,6 +38,7 @@ parameters {
   vector<lower=0>[n_isos] alpha; // GPR marginal standard-deviation
   vector<lower=0>[n_isos] sigma; // GPR regression-level noise scale
   vector[n_isos] beta_y1; // GPR AR1 mean function trend, per country
+  vector[n_isos] beta_0; // GPR time=0 AR bias correction to mean function trend, per country
 }
 
 transformed parameters {
@@ -53,7 +54,8 @@ model {
  alpha ~ gamma(2,1); // GPR marginal standard-deviation
  sigma ~ gamma(2,1); // GPR regression-level noise scale
  beta_dis ~ normal(0,5); // Disaster-severity regression coefficient
- beta_y1 ~ normal(mu_AR1, 2*sig_AR1); // GPR AR1 mean function coefficient - empirical Bayes
+ beta_y1 ~ normal(mu_AR1, 3*sig_AR1); // GPR AR1 mean function coefficient - empirical Bayes
+ beta_0 ~ normal(0,5); // GPR time=0 regression bias correction
  // GPR mean function
  vector[n_t] mu;
  // Per country, sample from the model!
@@ -81,7 +83,7 @@ model {
      }
      // Set the GPR mean function
      if (ttt == 1) {
-        mu[ttt] = beta_dis*dsev*(1 + csev[iso]);  // No past y available
+        mu[ttt] = beta_dis*dsev*(1 + csev[iso]) + beta_0;  // No past y available
       } else {
         mu[ttt] = beta_dis*dsev*(1 + csev[iso]) + beta_y1*y[iso, ttt-1]; // Auto-Regressive first order (AR1) model
       }
