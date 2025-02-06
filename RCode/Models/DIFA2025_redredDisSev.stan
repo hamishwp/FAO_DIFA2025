@@ -43,7 +43,6 @@ parameters {
 transformed parameters {
   vector<lower=0>[n_isos] sq_sigma;
   sq_sigma = square(sigma[1:n_isos]);
-  real<lower=0> dsev;
 }
 
 model {
@@ -68,7 +67,7 @@ model {
    // Sample through the EOY values
    for(ttt in 1:n_t){
      // Set the disaster severity to zero at first, as well as the GPR mean function
-     dsev = 0;
+     real dsev = 0;
      // Sample the disaster impact type on crops and cattle losses
      for(i_dis in 1:n_dis[iso]){
        // Check if the disaster comes after or before this year.
@@ -90,3 +89,4 @@ model {
    y[iso,] ~ multi_normal_cholesky(mu, L_K);
  }
 }
+
