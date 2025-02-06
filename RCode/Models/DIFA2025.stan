@@ -25,10 +25,10 @@ data {
   array[n_isos, n_dis] real<lower=0> alpha_dis;
   // (Gamma) Rate of disaster severity, per disaster
   array[n_isos, n_dis] real<lower=0> lambda_dis;
-  // Mean linear trend in commodity data, per country
-  vector[n_isos] real mu_lin;
-  // Standard deviation in linear trend in commodity data, per country
-  vector[n_isos] real<lower=0> sigma_lin;
+  // Mean AR1 trend in commodity data, per country
+  vector[n_isos] real mu_AR1;
+  // Standard deviation in AR1 trend in commodity data, per country
+  vector[n_isos] real<lower=0> sig_AR1;
 }
 
 parameters {
@@ -41,7 +41,6 @@ parameters {
   vector<lower=0>[n_isos] rho; // GPR length-scale
   vector<lower=0>[n_isos] alpha; // GPR marginal standard-deviation
   vector<lower=0>[n_isos] sigma; // GPR regression-level noise scale
-  vector[n_isos] beta_lin; // GPR linear mean function trend, per country
   vector[n_isos] beta_y1; // GPR AR1 mean function trend, per country
 }
 
@@ -58,8 +57,7 @@ model {
  alpha ~ gamma(2,1); // GPR marginal standard-deviation
  sigma ~ gamma(2,1); // GPR regression-level noise scale
  beta_dis ~ normal(0,5); // Disaster-severity regression coefficient
- beta_lin ~ normal(mu_lin, 2*sig_lin); // GPR linear mean function coefficient - empirical Bayes
- beta_y1 ~ normal(0,5); // GPR AR1 mean function coefficient
+ beta_y1 ~ normal(mu_AR1, 2*sig_AR1); // GPR AR1 mean function coefficient - empirical Bayes
  // GPR mean function
  vector[n_t] mu;
  // Per country, sample from the model!
@@ -89,9 +87,9 @@ model {
      }
      // Set the GPR mean function
      if (ttt == 1) {
-        mu[ttt] = beta_dis*dsev*(1 + csev[iso]) + beta_lin[iso]*ttt;  // No past y available
+        mu[ttt] = beta_dis*dsev*(1 + csev[iso]);  // No past y available
       } else {
-        mu[ttt] = beta_dis*dsev*(1 + csev[iso]) + beta_lin[iso]*ttt + beta_y1*y[iso, ttt-1]; // Auto-Regressive first order (AR1) model
+        mu[ttt] = beta_dis*dsev*(1 + csev[iso]) + beta_y1*y[iso, ttt-1]; // Auto-Regressive first order (AR1) model
       }
    }
    // Sample the commodity data!
