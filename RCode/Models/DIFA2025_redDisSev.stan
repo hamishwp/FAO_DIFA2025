@@ -11,7 +11,7 @@ data {
   array[n_isos] int<lower=1> n_dis; // Number of disasters, per country
   int<lower=1> n_haz; // Number of hazard types
   // Time series data - EOY
-  array[n_t] real time;
+  array[n_t] real<lower=0> time;
   // Commodity data
   matrix[n_isos,n_t] y;
   // Flag to ensure disasters do not contribute to years previous to the disaster occurrence
@@ -19,7 +19,7 @@ data {
   // Duration of the hazard during year ttt
   array[n_isos, n_t, max(n_dis)] real <lower = 0> duration;
   // Hazard type of the disaster
-  array[max(n_dis)] int <lower = 0> htype;
+  array[n_isos, max(n_dis)] int <lower = 0> htype;
   // Expected value of disaster severity, per disaster
   array[n_isos, max(n_dis)] real<lower=0> iprox;
   // Mean AR1 trend in commodity data, per country
@@ -75,7 +75,7 @@ model {
        // Check if the disaster comes after or before this year.
        if(flag[iso,ttt,i_dis]!=0) {
          // Save on computation
-         real iphs = iprox[iso,i_dis] / hsev[htype[i_dis]]; 
+         real iphs = iprox[iso,i_dis] / hsev[htype[iso,i_dis]]; 
          // Calculate the EOY disaster severity based on this disaster and add to total disaster severity for this EOY
          dsev += iprox[iso,i_dis]*(duration[iso, ttt, i_dis] + iphs*(1-exp(-duration[iso, ttt, i_dis]/iphs)));
        } 
