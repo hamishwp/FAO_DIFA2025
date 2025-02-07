@@ -131,12 +131,13 @@ stan_model <- stan_model(stan_model_code)
 mcmc_results <- sampling(
   object = stan_model, 
   data = data_list, 
-  chains = 8, 
+  chains = 4, 
   iter = 3000, 
-  thin = 4,
+  # thin = 4,
   warmup = 1000, 
   seed = 42,
-  control = list(adapt_delta = 0.95, max_treedepth=30)
+  control = list(adapt_delta = 0.95, max_treedepth=20),
+  sample_file="./Data/Results/Simulations/DIFA2025_redredDisSev.csv"
 )
 print(mcmc_results)
 

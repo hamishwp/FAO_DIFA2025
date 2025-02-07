@@ -2,6 +2,7 @@ directory<-paste0(getwd(),"/")
 # Prep work
 dir.create("./Data/RawData/",showWarnings = F)
 dir.create("./Plots",showWarnings = F)
+dir.create("./Data/Results/Simulations",showWarnings = F)
 
 if(!file.exists(paste0(directory,'RCode/Setup/GetEnv.R'))) 
   file.copy(paste0(directory,'RCode/Setup/GetEnv_Example.R'),
