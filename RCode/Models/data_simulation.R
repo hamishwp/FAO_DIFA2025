@@ -105,7 +105,7 @@ data_list <- list(
   n_dis = n_dis,
   n_haz = n_haz,
   time = time,
-  y = t(y),  # Transposed for Stan (column-major order)
+  y = y,  # Transposed for Stan (column-major order)
   flag = flag,
   duration = duration,
   htype = htype,

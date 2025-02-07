@@ -82,9 +82,9 @@ model {
      }
      // Set the GPR mean function
      if (ttt == 1) {
-        mu[ttt] = beta_dis*dsev*(1 + csev[iso]) + beta_0;  // No past y available
+        mu[ttt] = beta_dis*dsev*(1 + csev[iso]) + beta_0[iso];  // No past y available
       } else {
-        mu[ttt] = beta_dis*dsev*(1 + csev[iso]) + beta_y1*y[iso, ttt-1]; // Auto-Regressive first order (AR1) model
+        mu[ttt] = beta_dis*dsev*(1 + csev[iso]) + beta_y1[iso]*y[iso, ttt-1]; // Auto-Regressive first order (AR1) model
       }
    }
    // Sample the commodity data!
