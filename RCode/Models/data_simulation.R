@@ -15,12 +15,12 @@ time <- seq(1, n_t)
 # Gaussian Process Covariance Parameters
 rho <- rgamma(n_isos, shape = 2, scale = 2)   # Length-scale
 alpha <- rgamma(n_isos, shape = 2, scale = 1) # Marginal standard deviation
-sigma <- rgamma(n_isos, shape = 2, scale = 1) # Noise scale
+# sigma <- rgamma(n_isos, shape = 2, scale = 1) # Noise scale
 # AR1 Mean Function Priors
 mu_AR1 <- rep(1.2,n_isos)# rnorm(n_isos, mean = 1.2, sd = 0.1)       # Mean AR1 trend per country
 sig_AR1 <- rep(0.01,n_isos)#runif(n_isos, 0.01, 0.05)                # Standard deviation of AR1 trend
 beta_y1 <- rnorm(n_isos, mu_AR1, sig_AR1)   # AR1 mean function trend
-beta_0 <- abs(rnorm(n_isos, mean = 1000, sd = 300))       # Initial bias correction
+# beta_0 <- abs(rnorm(n_isos, mean = 1000, sd = 300))       # Initial bias correction
 # Disaster Parameters
 hsev <- (1:n_haz)^2 # rgamma(n_haz, shape = 2, scale = 1)  # Hazard severity by type
 csev <- rep(0.,n_isos)#rnorm(n_isos, mean = 0, sd = 0.5)      # Country severity
@@ -68,7 +68,7 @@ mu <- array(0, dim = c(n_isos, n_t)) # Mean function (GP + AR1)
 for (iso in 1:n_isos) {
   # Construct Covariance Matrix (Squared Exponential Kernel)
   K <- outer(time, time, function(t1, t2) alpha[iso]^2 * exp(-0.5 * (t1 - t2)^2 / rho[iso]^2))
-  diag(K) <- diag(K) + sigma[iso]^2  # Add noise
+  # diag(K) <- diag(K) + sigma[iso]^2  # Add noise
   
   # Sample GP from Multivariate Normal
   gp_samples <- MASS::mvrnorm(n = 1, mu = rep(0, n_t), Sigma = K)
@@ -86,7 +86,7 @@ for (iso in 1:n_isos) {
     
     # Compute Mean Function (GP + AR1)
     if (t == 1) {
-      mu[iso, t] <- beta_dis * dsev * (1 + csev[iso]) + beta_0[iso]
+      mu[iso, t] <- y[iso,t]
     } else {
       mu[iso, t] <- beta_dis * dsev * (1 + csev[iso]) + beta_y1[iso] * y[iso, t-1]
     }
@@ -133,6 +133,7 @@ mcmc_results <- sampling(
   data = data_list, 
   chains = 8, 
   iter = 3000, 
+  thin = 4,
   warmup = 1000, 
   seed = 42,
   control = list(adapt_delta = 0.95, max_treedepth=30)
@@ -141,29 +142,6 @@ print(mcmc_results)
 
 # Plot MCMC diagnostics
 traceplot(mcmc_results, pars = c("beta_dis", "hsev", "beta_y1"))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
