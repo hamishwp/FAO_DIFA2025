@@ -22,7 +22,7 @@ sig_AR1 <- rep(0.01,n_isos)#runif(n_isos, 0.01, 0.05)                # Standard 
 beta_y1 <- rnorm(n_isos, mu_AR1, sig_AR1)   # AR1 mean function trend
 beta_0 <- abs(rnorm(n_isos, mean = 1000, sd = 300))       # Initial bias correction
 # Disaster Parameters
-hsev <- rgamma(n_haz, shape = 2, scale = 1)  # Hazard severity by type
+hsev <- (1:n_haz)^2 # rgamma(n_haz, shape = 2, scale = 1)  # Hazard severity by type
 csev <- rep(0.,n_isos)#rnorm(n_isos, mean = 0, sd = 0.5)      # Country severity
 beta_dis <- -40                                # Disaster-severity regression coefficient
 
