@@ -18,6 +18,8 @@ data {
   array[n_isos, n_t, max(n_dis)] int <lower = 0, upper = 1> flag;
   // Duration of the hazard during year ttt
   array[n_isos, n_t, max(n_dis)] real <lower = 0> duration;
+  // Duration of the disaster post-hazard during year ttt
+  array[n_isos, n_t, max(n_dis)] real <lower = 0> hazdur;
   // Hazard type of the disaster
   array[n_isos, max(n_dis)] int <lower = 0> htype;
   // Expected value of disaster severity, per disaster
@@ -32,6 +34,7 @@ parameters {
   // Disaster parameters
   vector<lower=0>[n_haz] hsev; // Hazard severity, per hazard type
   real beta_dis; // Disaster-severity regression coefficient
+  real beta_dur; // Hazard duration regression coefficient
   // GPR covariance parameters
   vector<lower=0>[n_isos] rho; // GPR length-scale
   vector<lower=0>[n_isos] alpha; // GPR marginal standard-deviation
@@ -45,6 +48,7 @@ model {
  rho ~ gamma(2,2); // GPR length-scale
  alpha ~ gamma(2,1); // GPR marginal standard-deviation
  beta_dis ~ normal(0,20); // Disaster-severity regression coefficient
+ beta_dur ~ normal(0,5); // Hazard duration coefficient
  beta_y1 ~ normal(mu_AR1, sig_AR1); // GPR AR1 mean function coefficient - empirical Bayes
  // beta_0 ~ normal(0,5); // GPR time=0 regression bias correction
  // GPR mean function
@@ -68,7 +72,7 @@ model {
          // Save on computation
          real iphs = iprox[iso,i_dis] / hsev[htype[iso,i_dis]]; 
          // Calculate the EOY disaster severity based on this disaster and add to total disaster severity for this EOY
-         dsev += iprox[iso,i_dis]*(duration[iso, ttt, i_dis] + iphs*(1-exp(-duration[iso, ttt, i_dis]/iphs)));
+         dsev += iprox[iso,i_dis]*(hazdur[iso, ttt, i_dis]*beta_dur + iphs*(1-exp(-duration[iso, ttt, i_dis]/iphs)));
        } 
      }
      // Set the GPR mean function

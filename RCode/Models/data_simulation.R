@@ -31,6 +31,8 @@ beta_dis <- -20                                # Disaster-severity regression co
 htype <- array(0, dim = c(n_isos, max(n_dis))) 
 # Disaster occurrence flag
 flag <- array(0, dim = c(n_isos, n_t, max(n_dis))) 
+# Hazard duration per year
+hazdur <- array(0, dim = c(n_isos, n_t, max(n_dis))) 
 # Disaster duration per year
 duration <- array(0, dim = c(n_isos, n_t, max(n_dis))) 
 # Disaster severity
@@ -48,15 +50,31 @@ for (iso in 1:n_isos) {
   for (i in 1:n_dis[iso]) {
     start_year <- dis_years[i]
     duration_years <- rgamma(1,0.3,1)*htype[iso,i]  # Ensure enough space for multi-year disasters
+    startprop <- runif(1,0,1) # At which proportion of the year did the disaster occur?
     end_year <- min(floor(start_year + duration_years), n_t)  # Ensure disaster doesn't exceed time range
     # Set the flag for the disaster impact on EOY values
     flag[iso, start_year:n_t, i] <- 1  # Mark disaster occurrence
-    for (t in start_year:end_year) {
+    # Calculate the hazard and disaster duration arrays
+    for (t in start_year:n_t) {
       if (t == start_year) {
-        duration[iso, t, i] <- rgamma(1,0.3,1)  # First & last year: fraction of year
+        if(1-startprop>=duration_years){ # hazard lasts less than one year
+          hazdur[iso, start_year, i] <- duration_years
+          duration[iso, t, i] <- 1-startprop-duration_years
+        } else { # hazard lasts more than in the initial year
+          hazdur[iso, start_year, i] <- 1-startprop
+          duration[iso, t, i] <- 0
+        }
+      } else if (t < end_year){        
+        # Intermediate years: Hazard is active for the full year, no additional duration needed
+        hazdur[iso, t, i] <- 1
+        duration[iso, t, i] <- 0  # Nothing left over in intermediate years
       } else if (t == end_year){
-        duration[iso, t, i] <- duration_years - duration[iso, t, start_year] - floor(duration_years - duration[iso, t, start_year])
+        # Final year: Hazard ends sometime in the year
+        remaining_hazard <- duration_years - sum(hazdur[iso, start_year:(t-1), i])
+        hazdur[iso, t, i] <- min(remaining_hazard, 1)  # Ensure it doesn't exceed a full year
+        duration[iso, t, i] <- 1 - hazdur[iso, t, i]  # Remaining portion of the year
       } else {
+        hazdur[iso, t, i] <- 0
         duration[iso, t, i] <- 1  # Full year duration for intermediate years
       }
     }
@@ -81,7 +99,7 @@ for (iso in 1:n_isos) {
     for (i_dis in 1:n_dis[iso]) {
       if (flag[iso, t, i_dis] == 1) {
         iphs <- iprox[iso, i_dis] / hsev[htype[i_dis]]
-        dsev <- dsev + iprox[iso, i_dis] * (duration[iso, t, i_dis] + 
+        dsev <- dsev + iprox[iso, i_dis] * (hazdur[iso, t, i_dis] + 
                                               iphs * (1 - exp(-duration[iso, t, i_dis] / iphs)))
       }
     }
@@ -110,6 +128,7 @@ data_list <- list(
   y = y,  # Transposed for Stan (column-major order)
   flag = flag,
   duration = duration,
+  hazdur = hazdur,
   htype = htype,
   iprox = iprox,
   mu_AR1 = mu_AR1,
