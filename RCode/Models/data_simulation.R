@@ -96,7 +96,7 @@ for (iso in 1:n_isos) {
   
 }
 
-y<-y/1000; y
+y
 
 # ----- Format Data for Stan -----
 data_list <- list(
@@ -127,35 +127,20 @@ rstan_options(auto_write = TRUE)
 stan_model_code <- "./RCode/Models/DIFA2025_redredDisSev.stan"  # Specify your Stan model path
 stan_model <- stan_model(stan_model_code)
 
-# ----- Optimization Step -----
-opt_results <- optimizing(
-  object = stan_model, 
-  data = data_list, 
-  verbose = TRUE
-)
-print(opt_results)
-print(opt_results$par)  # Optimised parameter estimates
-
-
-
-
-
-
-
 # ----- MCMC Sampling -----
 mcmc_results <- sampling(
   object = stan_model, 
   data = data_list, 
-  chains = 4, 
-  iter = 2000, 
+  chains = 8, 
+  iter = 3000, 
   warmup = 1000, 
   seed = 42,
-  control = list(adapt_delta = 0.95)
+  control = list(adapt_delta = 0.95, max_treedepth=30)
 )
 print(mcmc_results)
 
 # Plot MCMC diagnostics
-traceplot(mcmc_results, pars = c("beta_dis", "sigma", "rho"))
+traceplot(mcmc_results, pars = c("beta_dis", "hsev", "beta_y1"))
 
 
 
