@@ -18,13 +18,13 @@ alpha <- rgamma(n_isos, shape = 2, scale = 1) # Marginal standard deviation
 # sigma <- rgamma(n_isos, shape = 2, scale = 1) # Noise scale
 # AR1 Mean Function Priors
 mu_AR1 <- rep(1.2,n_isos)# rnorm(n_isos, mean = 1.2, sd = 0.1)       # Mean AR1 trend per country
-sig_AR1 <- rep(0.01,n_isos)#runif(n_isos, 0.01, 0.05)                # Standard deviation of AR1 trend
+sig_AR1 <- rep(0.1,n_isos)#runif(n_isos, 0.01, 0.05)                # Standard deviation of AR1 trend
 beta_y1 <- rnorm(n_isos, mu_AR1, sig_AR1)   # AR1 mean function trend
 # beta_0 <- abs(rnorm(n_isos, mean = 1000, sd = 300))       # Initial bias correction
 # Disaster Parameters
 hsev <- (1:n_haz)^2 # rgamma(n_haz, shape = 2, scale = 1)  # Hazard severity by type
 csev <- rep(0.,n_isos)#rnorm(n_isos, mean = 0, sd = 0.5)      # Country severity
-beta_dis <- -40                                # Disaster-severity regression coefficient
+beta_dis <- -20                                # Disaster-severity regression coefficient
 
 # ----- Generate Disaster Information -----
 # Hazard types per disaster 
@@ -52,8 +52,10 @@ for (iso in 1:n_isos) {
     # Set the flag for the disaster impact on EOY values
     flag[iso, start_year:n_t, i] <- 1  # Mark disaster occurrence
     for (t in start_year:end_year) {
-      if (t == start_year | t == end_year) {
+      if (t == start_year) {
         duration[iso, t, i] <- rgamma(1,0.3,1)  # First & last year: fraction of year
+      } else if (t == end_year){
+        duration[iso, t, i] <- duration_years - duration[iso, t, start_year] - floor(duration_years - duration[iso, t, start_year])
       } else {
         duration[iso, t, i] <- 1  # Full year duration for intermediate years
       }
@@ -132,11 +134,11 @@ mcmc_results <- sampling(
   object = stan_model, 
   data = data_list, 
   chains = 4, 
-  iter = 3000, 
+  iter = 2000, 
   # thin = 4,
   warmup = 1000, 
   seed = 42,
-  control = list(adapt_delta = 0.95, max_treedepth=20),
+  control = list(adapt_delta = 0.95, max_treedepth=15),
   sample_file="./Data/Results/Simulations/DIFA2025_redredDisSev.csv"
 )
 print(mcmc_results)
