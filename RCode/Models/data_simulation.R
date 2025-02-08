@@ -20,11 +20,12 @@ alpha <- rgamma(n_isos, shape = 2, scale = 1) # Marginal standard deviation
 mu_AR1 <- rep(1.2,n_isos)# rnorm(n_isos, mean = 1.2, sd = 0.1)       # Mean AR1 trend per country
 sig_AR1 <- rep(0.1,n_isos)#runif(n_isos, 0.01, 0.05)                # Standard deviation of AR1 trend
 beta_y1 <- rnorm(n_isos, mu_AR1, sig_AR1)   # AR1 mean function trend
-# beta_0 <- abs(rnorm(n_isos, mean = 1000, sd = 300))       # Initial bias correction
+beta_0 <- abs(rnorm(n_isos, mean = 1000, sd = 300))       # Initial bias correction
 # Disaster Parameters
 hsev <- (1:n_haz)^2 # rgamma(n_haz, shape = 2, scale = 1)  # Hazard severity by type
 csev <- rep(0.,n_isos)#rnorm(n_isos, mean = 0, sd = 0.5)      # Country severity
-beta_dis <- -20                                # Disaster-severity regression coefficient
+beta_dis <- -0.000001 # Disaster-severity regression coefficient
+beta_dur <- 0.0001 # Hazard duration contribution to disaster severity
 
 # ----- Generate Disaster Information -----
 # Hazard types per disaster 
@@ -34,7 +35,7 @@ flag <- array(0, dim = c(n_isos, n_t, max(n_dis)))
 # Hazard duration per year
 hazdur <- array(0, dim = c(n_isos, n_t, max(n_dis))) 
 # Disaster duration per year
-duration <- array(0, dim = c(n_isos, n_t, max(n_dis))) 
+tdecay <- array(0, dim = c(n_isos, n_t, max(n_dis))) 
 # Disaster severity
 iprox <- array(0, dim = c(n_isos, max(n_dis))) 
 
@@ -59,23 +60,23 @@ for (iso in 1:n_isos) {
       if (t == start_year) {
         if(1-startprop>=duration_years){ # hazard lasts less than one year
           hazdur[iso, start_year, i] <- duration_years
-          duration[iso, t, i] <- 1-startprop-duration_years
+          tdecay[iso, t, i] <- t-startprop-duration_years
         } else { # hazard lasts more than in the initial year
           hazdur[iso, start_year, i] <- 1-startprop
-          duration[iso, t, i] <- 0
+          tdecay[iso, t, i] <- t
         }
       } else if (t < end_year){        
         # Intermediate years: Hazard is active for the full year, no additional duration needed
         hazdur[iso, t, i] <- 1
-        duration[iso, t, i] <- 0  # Nothing left over in intermediate years
+        tdecay[iso, t, i] <- t  # Nothing left over in intermediate years
       } else if (t == end_year){
         # Final year: Hazard ends sometime in the year
         remaining_hazard <- duration_years - sum(hazdur[iso, start_year:(t-1), i])
         hazdur[iso, t, i] <- min(remaining_hazard, 1)  # Ensure it doesn't exceed a full year
-        duration[iso, t, i] <- 1 - hazdur[iso, t, i]  # Remaining portion of the year
+        tdecay[iso, t, i] <- t - hazdur[iso, t, i]  # Remaining portion of the year
       } else {
         hazdur[iso, t, i] <- 0
-        duration[iso, t, i] <- 1  # Full year duration for intermediate years
+        tdecay[iso, t, i] <- t-1  # Full year duration for intermediate years
       }
     }
   }
@@ -98,15 +99,21 @@ for (iso in 1:n_isos) {
     dsev <- 0
     for (i_dis in 1:n_dis[iso]) {
       if (flag[iso, t, i_dis] == 1) {
+        dsev <- dsev + iprox[iso, i_dis] * hazdur[iso, t, i_dis]*beta_dur
         iphs <- iprox[iso, i_dis] / hsev[htype[i_dis]]
-        dsev <- dsev + iprox[iso, i_dis] * (hazdur[iso, t, i_dis] + 
-                                              iphs * (1 - exp(-duration[iso, t, i_dis] / iphs)))
+        if(tdecay[iso, t, i_dis]<t-1){
+          # Calculate the EOY disaster severity based on this disaster and add to total disaster severity for this EOY
+          dsev = dsev + iprox[iso, i_dis]*iphs*(1-exp(-(t-tdecay[iso, t, i_dis])/iphs))
+        } else {
+          t0 = t-1-tdecay[iso, t, i_dis]
+          # Calculate the EOY disaster severity based on this disaster and add to total disaster severity for this EOY
+          dsev = dsev + iprox[iso, i_dis]*iphs*(exp(-t0/iphs)-exp(-(t0+1)/iphs))
+        }
       }
     }
-    
     # Compute Mean Function (GP + AR1)
     if (t == 1) {
-      mu[iso, t] <- y[iso,t]
+      mu[iso, t] <- beta_0[iso]
     } else {
       mu[iso, t] <- beta_dis * dsev * (1 + csev[iso]) + beta_y1[iso] * y[iso, t-1]
     }
@@ -127,7 +134,7 @@ data_list <- list(
   time = time,
   y = y,  # Transposed for Stan (column-major order)
   flag = flag,
-  duration = duration,
+  tdecay = tdecay,
   hazdur = hazdur,
   htype = htype,
   iprox = iprox,

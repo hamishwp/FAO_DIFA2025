@@ -1,6 +1,6 @@
 // NOTES
 // - if this works, then beta_dis should be negative (beta_dis is the disaster regression coefficient)
-// - duration must be in years, not days
+// - tdecay must be in years, not days
 // - check conversion of array dimensions from R to stan: row-column or column-row?
 // - check whether normal(mu_dis[iso, 1:n_dis[iso]], sigma_dis[iso, 1:n_dis[iso]]) needs to be iterated over instead of the vector input
 
@@ -16,8 +16,10 @@ data {
   matrix[n_isos,n_t] y;
   // Flag to ensure disasters do not contribute to years previous to the disaster occurrence
   array[n_isos, n_t, max(n_dis)] int <lower = 0, upper = 1> flag;
-  // Duration of the hazard during year ttt
-  array[n_isos, n_t, max(n_dis)] real <lower = 0> duration;
+  // Time t-1 of the disaster since the end of the hazard for EOY t
+  array[n_isos, n_t, max(n_dis)] real <lower = 0> ts;
+  // Time t of the disaster since the end of the hazard for EOY t
+  array[n_isos, n_t, max(n_dis)] real <lower = 0> tf;
   // Duration of the disaster post-hazard during year ttt
   array[n_isos, n_t, max(n_dis)] real <lower = 0> hazdur;
   // Hazard type of the disaster
@@ -53,6 +55,8 @@ model {
  // beta_0 ~ normal(0,5); // GPR time=0 regression bias correction
  // GPR mean function
  vector[n_t] mu;
+ // Flag vector for faster computation
+ vector[max(n_dis)] flag_vec = rep_vector(0,max(n_dis));
  // Per country, sample from the model!
  for(iso in 1:n_isos){
    // GPR Covariance matrix
@@ -65,16 +69,36 @@ model {
    for(ttt in 1:n_t){
      // Set the disaster severity to zero at first, as well as the GPR mean function
      real dsev = 0;
-     // Sample the disaster impact type on crops and cattle losses
-     for(i_dis in 1:n_dis[iso]){
-       // Check if the disaster comes after or before this year.
-       if(flag[iso,ttt,i_dis]!=0) {
-         // Save on computation
-         real iphs = iprox[iso,i_dis] / hsev[htype[iso,i_dis]]; 
-         // Calculate the EOY disaster severity based on this disaster and add to total disaster severity for this EOY
-         dsev += iprox[iso,i_dis]*(hazdur[iso, ttt, i_dis]*beta_dur + iphs*(1-exp(-duration[iso, ttt, i_dis]/iphs)));
-       } 
+     flag_vec = to_vector(flag[iso, ttt, ])
+     if(sum(flag_vec>0){
+       // Save on computation
+       vector<lower=0> iphs = to_vector(iprox[iso, ]) / hsev[to_vector(htype[iso, ])];
+       // Calculate the disaster severity
+       dsev = sum(flag_vec*(
+         to_vector(iprox[iso, ])*to_vector(hazdur[iso, ttt,  ])*beta_dur +
+         to_vector(iprox[iso, ])*iphs*(exp(-to_vector(ts[iso,ttt, ])/iphs)-
+         exp(-(to_vector(tf[iso,ttt, ])+1)/iphs))
+         ));
      }
+     // // Sample the disaster impact type on crops and cattle losses
+     // for(i_dis in 1:n_dis[iso]){
+     //   // Check if the disaster comes after or before this year.
+     //   if(flag[iso,ttt,i_dis]!=0) {
+     //     // Add the hazard duration element of the disaster severity
+     //     dsev += iprox[iso,i_dis]*hazdur[iso, ttt, i_dis]*beta_dur;
+     //     // Save on computation
+     //     real iphs = iprox[iso,i_dis] / hsev[htype[iso,i_dis]]; 
+     //     // If the hazard ended in this year, add the decay rate element of the disaster severity
+     //     if(tdecay[iso, ttt, i_dis]<ttt-1){
+     //       // Calculate the EOY disaster severity based on this disaster and add to total disaster severity for this EOY
+     //       dsev += iprox[iso,i_dis]*iphs*(1-exp(-(ttt-tdecay[iso, ttt, i_dis])/iphs)));
+     //     } else {
+     //       real t0 = ttt-1-tdecay[iso, ttt, i_dis];
+     //       // Calculate the EOY disaster severity based on this disaster and add to total disaster severity for this EOY
+     //       dsev += iprox[iso,i_dis]*iphs*(exp(-t0/iphs)-exp(-(t0+1)/iphs)));
+     //     }
+     //   } 
+     // }
      // Set the GPR mean function
      if (ttt == 1) {
         mu[ttt] = y[iso, ttt];  // No past y available

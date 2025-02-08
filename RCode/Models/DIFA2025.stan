@@ -17,8 +17,8 @@ data {
   matrix[n_isos,n_t] y;
   // Flag to ensure disasters do not contribute to years previous to the disaster occurrence
   array[n_isos, n_t, max(n_dis)] int <lower = 0, upper = 1> flag;
-  // Duration of the hazard during year ttt
-  array[n_isos, n_t, max(n_dis)] real <lower = 0> duration;
+  // Time t-1 of the disaster since the end of the hazard for EOY t
+  array[n_isos, n_t, max(n_dis)] real <lower = 0> tdecay;
   // Duration of the disaster post-hazard during year ttt
   array[n_isos, n_t, max(n_dis)] real <lower = 0> hazdur;
   // Hazard type of the disaster
@@ -77,10 +77,19 @@ model {
      for(i_dis in 1:n_dis[iso]){
        // Check if the disaster comes after or before this year.
        if(flag[iso,ttt,i_dis]!=0) {
+         // Add the hazard duration element of the disaster severity
+         dsev += iprox[iso,i_dis]*hazdur[iso, ttt, i_dis]*beta_dur;
          // Save on computation
-         real iphs = iprox[iso,i_dis] / hsev[htype[iso,i_dis]]; 
-         // Calculate the EOY disaster severity based on this disaster and add to total disaster severity for this EOY
-         dsev += iprox[iso,i_dis] * (hazdur[iso, ttt, i_dis]*beta_dur + iphs*(1-exp(-duration[iso, ttt, i_dis]/iphs)));
+         real iphs = iprox[iso,i_dis]*iprox[iso,i_dis] / hsev[htype[iso,i_dis]]; 
+         // If the hazard ended in this year, add the decay rate element of the disaster severity
+         if(tdecay[iso, ttt, i_dis]<ttt-1){
+           // Calculate the EOY disaster severity based on this disaster and add to total disaster severity for this EOY
+           dsev += iphs*(1-exp(-(ttt-tdecay[iso, ttt, i_dis])/iphs)));
+         } else {
+           real t0 = ttt-1-tdecay[iso, ttt, i_dis];
+           // Calculate the EOY disaster severity based on this disaster and add to total disaster severity for this EOY
+           dsev += iphs*(exp(-t0/iphs)-exp(-(t0+1)/iphs)));
+         }
        } 
      }
      // Set the GPR mean function
