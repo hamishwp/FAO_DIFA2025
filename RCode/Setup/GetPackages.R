@@ -74,7 +74,7 @@ GetPackages<-function(packred=T){
   
 }
 
-GetPackages(packred)
+GetPackages() 
 
 # # Check the structure of the repository
 # filers<-c(paste0(directory,"Plots"))
