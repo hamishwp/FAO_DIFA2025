@@ -5,7 +5,8 @@ GetFAOSTAT_All<-function(syear=1990,fyear=NULL){
   FAOSTAT <- GetFAOSTAT_Prod(syear=syear,fyear=fyear)
   
   return(list(yield = FAOSTAT$yield_data,
-              prod = FAOSTAT$prod_data,
+              MF = FAOSTAT$MF,
+              Prod = FAOSTAT$Prod,
               price=GetFAOSTAT_Price(syear=syear,fyear=fyear)))
 }
 
@@ -325,5 +326,116 @@ CleanFAOSTAT <- function(FAOSTAT){
       Item
     )
 
-  return(list(yield_data = YIELD, prod_data = MF))
+  ###################### ITEM CATEGORIES
+  
+  ## adding the grouping of 2021 report
+  Cereals = c(44, 89, 101, 108, 94, 103, 56, 79, 75, 92, 27, 71, 83, 97, 15)
+ 
+  Coffee_tea_cocoa_spice = c(711, 689, 693, 698, 661, 656, 720, 671, 702, 687, 723, 667, 692)
+
+  Fruits_nuts = c(221, 515, 526, 226, 572, 486, 558, 552, 216, 217, 591,
+                  531, 530, 220, 554, 550, 577, 569, 512, 542, 603, 549,
+                  507, 560, 225, 592, 224, 497, 571, 243, 490, 600, 534,
+                  521, 587, 574, 223, 489, 536, 523, 547, 544, 495, 222, 1729,
+                  619,541,234)
+  
+  Hides_skins = c(957, 919, 1025, 1044, 995)
+ 
+  Legumes = c(203, 176, 181, 191, 195, 201, 210, 187, 197, 211, 205)
+  
+  Oilseeds = c(265, 249, 329, 242, 336, 277, 310, 311, 263, 333, 299,
+               292, 254, 257, 339, 260, 256, 296, 270, 280, 328, 289,
+               236, 267, 305, 275)
+  
+  Meat = c(949, 1129, 869, 1019, 1037, 979, 1122, 1084, 972, 1137, 944,
+           1094, 1070, 1077, 1032, 1120, 1124, 1161, 1055, 1144, 1154,
+           1012, 1087, 1166, 1108, 1089, 947, 1127, 867, 1058, 1069, 1163,
+           1017, 1073, 1097, 1111, 1158, 1151, 1035, 1151, 977, 1080, 948,
+           1128, 868, 1018, 1098, 1036, 978, 1185, 1176,
+           1806,1808,1807,1141)
+  
+  Milk_honey_eggs = c(1183, 1062, 1067, 1091, 1092, 1182, 951, 1130, 882, 1020, 982, 987)
+  
+  Roots_tuber =c(125, 116, 149, 122, 136, 137, 135)
+  
+  Sugar_crops = c(157, 156, 161)
+  
+  tobacco_fibres_rubber =c(461, 459, 839, 677, 748, 754, 836, 826,
+                           782,773,789,821,777,780,788,800,809)
+  
+  vegetables = c(366, 367, 414, 358, 426, 378, 393, 401, 397,
+                 399, 406, 407, 372, 446, 568, 449, 430, 403,
+                 402, 417, 394, 373, 423, 388, 463, 420, 567)
+  
+  Production <- FAO_F1%>%
+    filter(
+      Element == "Production"
+    )%>%
+    transmute(
+      ISO3.CODE,
+      Item,
+      Year,
+      Unit,
+      Production = fifelse(
+        Unit == "1000 No",
+        Value*1000,
+        Value
+      ),
+      Item.Code,
+      item_grouping_12 = case_when(
+        Item.Code %in% Cereals ~ "Cereals",
+        Item.Code %in% Coffee_tea_cocoa_spice ~ "Coffee, tea, cocoa & spice crops",
+        Item.Code %in% Fruits_nuts ~ "Fruits & nuts",
+        Item.Code %in% Hides_skins ~ "Hides & skins",
+        Item.Code %in% Legumes ~ "Legumes",
+        Item.Code %in% Oilseeds ~ "Oilseeds",
+        Item.Code %in% Meat ~ "Meat & meat products",
+        Item.Code %in% Milk_honey_eggs ~ "Milk, Honey & eggs",
+        Item.Code %in% Roots_tuber ~ "Roots & tubers",
+        Item.Code %in% Sugar_crops ~ "Sugar crops",
+        Item.Code %in% tobacco_fibres_rubber ~ "Tobacco, Rubber & Fibre crops",
+        Item.Code %in% vegetables ~ "Vegetables"),
+      item_grouping_2 = case_when(
+        Item.Code %in% Cereals ~ "Plant_based",
+        Item.Code %in% Coffee_tea_cocoa_spice ~ "Plant_based",
+        Item.Code %in% Fruits_nuts ~ "Plant_based",
+        Item.Code %in% Hides_skins ~ "Livestock_products",
+        Item.Code %in% Legumes ~ "Plant_based",
+        Item.Code %in% Oilseeds ~ "Plant_based",
+        Item.Code %in% Meat ~ "Livestock_products",
+        Item.Code %in% Milk_honey_eggs ~ "Livestock_products",
+        Item.Code %in% Roots_tuber ~ "Plant_based",
+        Item.Code %in% Sugar_crops ~ "Plant_based",
+        Item.Code %in% tobacco_fibres_rubber ~ "Plant_based",
+        Item.Code %in% vegetables ~ "Plant_based")
+    )%>%
+    filter(
+      !is.na(Item.Code) 
+    )
+  
+  return(list(yield_data = YIELD, MF = MF,Prod = Production))
+}
+
+GetModelProduction<-function(syear=1990,fyear=NULL){
+  # Set the upper limit for the year
+  if(is.null(fyear)) fyear<-AsYear(Sys.Date())
+  # Production & prices
+  FAOSTAT <- GetFAOSTAT_Prod(syear=syear,fyear=fyear)
+  
+  FAOSTAT_PROD = FAOSTAT$Prod
+  
+  Model_Data <- FAOSTAT_PROD%>%
+    filter(
+      Unit == "t"
+    )%>%
+    group_by(
+      item_grouping_2,
+      Year,
+      ISO3.CODE
+    )%>%
+    summarise(
+      Production = sum(Production,na.rm=TRUE)
+    )
+  
+
 }
