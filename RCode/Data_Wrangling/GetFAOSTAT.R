@@ -437,5 +437,6 @@ GetModelProduction<-function(syear=1990,fyear=NULL){
       Production = sum(Production,na.rm=TRUE)
     )
   
+  return(Model_Data)
 
 }
