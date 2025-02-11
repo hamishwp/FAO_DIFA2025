@@ -1,6 +1,6 @@
 ---
 title: "Disaster Severity"
-subtitle: "Hamish Patten and Ignacio Costa"
+subtitle: "Hamish Patten and Ignacio Acosta"
 output:
   prettydoc::html_pretty:
     theme: architect
@@ -80,6 +80,10 @@ convIso3Continent<-function(iso3){
                                        origin = "iso3c",
                                        destination = "continent",warn = F)
 }
+
+ # Regions
+IsoContinentRegion <- read_excel("Data/Taxonomies/IsoContinentRegion.xlsx")
+
 ```
 
 </div>
@@ -99,9 +103,402 @@ Ignacio, please will you analyse the Desinventar data via the following plots?
 We need to analyse bias in the data, so let's check out the following:
 
 * Table of number of Desinventar records with crop and cattle losses per country (thus three columns)
-* Barplot of number of Desinventar records with crop and cattle losses (1 plot for crops 1 for cattle) per UN subregion (from the IsoContinentRegion.xlsx file in the taxonomies data folder - this requires using left_join by the ISO codes and please note all of the countries that were not successfully merged and please add them to the IsoContinentRegion file)
+
+```{r records, message=FALSE,warning=FALSE, echo=FALSE}
+dessie%>%
+  group_by(ISO3) %>%
+  summarise(
+    Crop_Info = sum(!is.na(damages_in_crops_ha)), 
+    Animals_Info = sum(!is.na(lost_cattle))
+  )%>%
+kableExtra::kable(
+  col.names = c(
+    "Country - ISO3",
+    "Crop records",
+    "Livestock records"
+    )
+  )
+``` 
+
+
+* Barplot of number of Desinventar records with crop and cattle losses by region
+
+```{r barplot_reg, message=FALSE,warning=FALSE, echo=FALSE}
+dessie%>%
+  left_join(
+    IsoContinentRegion%>%
+      rename(
+        Region = 'UN Region',
+        ISO3 = 'ISO Code'
+      )%>%
+      select(
+        Region,
+        ISO3
+      ),
+    by = "ISO3"
+  )%>%
+  filter(
+    !is.na(Region)
+  )%>%
+  group_by(Region) %>%
+  summarise(
+    Crop_Info = sum(!is.na(damages_in_crops_ha)), 
+    Animals_Info = sum(!is.na(lost_cattle))
+  )%>%
+  ggplot(
+    aes(
+      x = reorder(Region,-Crop_Info),
+      y = Crop_Info
+    )
+  )+
+  geom_bar(
+    stat = "identity",
+    fill = "#5b9dcf"
+  ) +
+  labs(
+        x = "Region",
+        y = "Number of registers",
+        title = "Number of desinventar records associated to crops by region"
+      )  +
+      theme(
+        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        legend.position = "none"
+      ) 
+
+dessie%>%
+  left_join(
+    IsoContinentRegion%>%
+      rename(
+        Region = 'UN Region',
+        ISO3 = 'ISO Code'
+      )%>%
+      select(
+        Region,
+        ISO3
+      ),
+    by = "ISO3"
+  )%>%
+  filter(
+    !is.na(Region)
+  )%>%
+  group_by(Region) %>%
+  summarise(
+    Crop_Info = sum(!is.na(damages_in_crops_ha)), 
+    Animals_Info = sum(!is.na(lost_cattle))
+  )%>%
+  ggplot(
+    aes(
+      x = reorder(Region,-Animals_Info),
+      y = Animals_Info
+    )
+  )+
+  geom_bar(
+    stat = "identity",
+    fill = "#5b9dcf"
+  ) +
+  labs(
+        x = "Region",
+        y = "Number of registers",
+        title = "Number of desinventar records associated to animals by region"
+      )  +
+      theme(
+        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        legend.position = "none"
+      ) 
+
+dessie%>%
+  left_join(
+    IsoContinentRegion%>%
+      rename(
+        Region = 'UN Region',
+        ISO3 = 'ISO Code'
+      )%>%
+      select(
+        Region,
+        ISO3
+      ),
+    by = "ISO3"
+  )%>%
+  filter(
+    !is.na(Region)
+  )%>%
+  group_by(Region) %>%
+  summarise(
+    Crop_Info = sum(!is.na(damages_in_crops_ha)), 
+    Animals_Info = sum(!is.na(lost_cattle))
+  )%>%
+  pivot_longer(
+    Crop_Info:Animals_Info,
+    names_to = "Concept",
+    values_to = "Records"
+  )%>%
+  ggplot(
+    aes(
+      x = reorder(Region,-Records),
+      y = Records,
+      fill = Concept
+    )
+  )+
+  geom_bar(
+    stat = "identity",
+    position = "dodge"
+  ) +
+  labs(
+        x = "Region",
+        y = "Number of registers",
+        title = "Number of desinventar records associated to animals/crop by region"
+      )  +
+      theme(
+        plot.title = element_text(family = "Arial", size = 12, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        axis.text.x  = element_text(size = 7)
+      ) 
+```
+
 * Barplot of number of Desinventar records with crop and cattle losses per hazard type (use haz_Ab)
+
+```{r barplot_haz, message=FALSE,warning=FALSE, echo=FALSE}
+dessie%>%
+  group_by(haz_Ab) %>%
+  summarise(
+    Crop_Info = sum(!is.na(damages_in_crops_ha)), 
+    Animals_Info = sum(!is.na(lost_cattle))
+  )%>%
+  ggplot(
+    aes(
+      x = reorder(haz_Ab,-Crop_Info),
+      y = Crop_Info
+    )
+  )+
+  geom_bar(
+    stat = "identity",
+    fill = "#5b9dcf"
+  ) +
+  labs(
+        x = "Hazard",
+        y = "Number of registers",
+        title = "Number of desinventar records associated to crops by hazard"
+      )  +
+      theme(
+        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        legend.position = "none"
+      ) 
+
+dessie%>%
+  group_by(haz_Ab) %>%
+  summarise(
+    Crop_Info = sum(!is.na(damages_in_crops_ha)), 
+    Animals_Info = sum(!is.na(lost_cattle))
+  )%>%
+  ggplot(
+    aes(
+      x = reorder(haz_Ab,-Animals_Info),
+      y = Animals_Info
+    )
+  )+
+  geom_bar(
+    stat = "identity",
+    fill = "#5b9dcf"
+  ) +
+  labs(
+        x = "Hazard",
+        y = "Number of registers",
+        title = "Number of desinventar records associated to animals by hazard"
+      )  +
+      theme(
+        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        legend.position = "none"
+      ) 
+
+dessie%>%
+  group_by(haz_Ab) %>%
+  summarise(
+    Crop_Info = sum(!is.na(damages_in_crops_ha)), 
+    Animals_Info = sum(!is.na(lost_cattle))
+  )%>%
+  pivot_longer(
+    Crop_Info:Animals_Info,
+    names_to = "Concept",
+    values_to = "Records"
+  )%>%
+  ggplot(
+    aes(
+      x = reorder(haz_Ab,-Records),
+      y = Records,
+      fill = Concept
+    )
+  )+
+  geom_bar(
+    stat = "identity",
+    position = "dodge"
+  ) +
+  labs(
+        x = "Region",
+        y = "Number of registers",
+        title = "Number of desinventar records associated to animals/crop by haz"
+      )  +
+      theme(
+        plot.title = element_text(family = "Arial", size = 12, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        axis.text.x  = element_text(size = 7)
+      ) 
+```
+
 * Point plot of number of Desinventar records with crop and cattle losses in time
+
+```{r time, message=FALSE,warning=FALSE, echo=FALSE}
+dessie%>%
+  mutate(
+    Year = lubridate::year(date),
+    Year = case_when(
+      Year == 2103 ~ 2013,
+      Year == 2104 ~ 2014,
+      Year == 2202 ~ 2022,
+      TRUE ~ Year
+    )
+  )%>%
+  filter(
+    Year >= 1990
+  )%>%
+  group_by(Year) %>%
+  summarise(
+    Crop_Info = sum(!is.na(damages_in_crops_ha)), 
+    Animals_Info = sum(!is.na(lost_cattle))
+  )%>%
+  ggplot(
+    aes(
+      x = Year,
+      y = Crop_Info
+    )
+  )+
+  geom_point(
+    colour = "black", size = 1
+  ) +
+  geom_line(
+    size = 1, alpha = 0.6,color = "#5b9dcf"
+  )+
+  labs(
+        x = "Year",
+        y = "Number of registers",
+        title = "Number of desinventar records associated to crops by year"
+      )  +
+      theme(
+        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        legend.position = "bottom"
+      ) 
+
+dessie%>%
+  mutate(
+    Year = lubridate::year(date),
+    Year = case_when(
+      Year == 2103 ~ 2013,
+      Year == 2104 ~ 2014,
+      Year == 2202 ~ 2022,
+      TRUE ~ Year
+    )
+  )%>%
+  filter(
+    Year >= 1990
+  )%>%
+  group_by(Year) %>%
+  summarise(
+    Crop_Info = sum(!is.na(damages_in_crops_ha)), 
+    Animals_Info = sum(!is.na(lost_cattle))
+  )%>%
+  ggplot(
+    aes(
+      x = Year,
+      y = Animals_Info
+    )
+  )+
+  geom_point(
+    colour = "black", size = 1
+  ) +
+  geom_line(
+    size = 1, alpha = 0.6,color = "#5b9dcf"
+  )+
+  labs(
+        x = "Year",
+        y = "Number of registers",
+        title = "Number of desinventar records associated to animals by year"
+      )  +
+      theme(
+        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        legend.position = "bottom"
+      ) 
+
+dessie%>%
+  mutate(
+    Year = lubridate::year(date),
+    Year = case_when(
+      Year == 2103 ~ 2013,
+      Year == 2104 ~ 2014,
+      Year == 2202 ~ 2022,
+      TRUE ~ Year
+    )
+  )%>%
+  filter(
+    Year >= 1990
+  )%>%
+  group_by(Year) %>%
+  summarise(
+    Crop_Info = sum(!is.na(damages_in_crops_ha)), 
+    Animals_Info = sum(!is.na(lost_cattle))
+  )%>%
+  pivot_longer(
+    Crop_Info:Animals_Info,
+    names_to = "Concept",
+    values_to = "Registers"
+  )%>%
+  ggplot(
+    aes(
+      x = Year,
+      y = Registers,
+      colour = Concept
+    )
+  )+
+  geom_point(
+    colour = "black", size = 1
+  ) +
+  geom_line(
+    size = 1, alpha = 0.6
+  )+
+  labs(
+        x = "Year",
+        y = "Number of registers",
+        title = "Number of desinventar records associated to crops/animals by year"
+      )  +
+      theme(
+        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        legend.position = "bottom"
+      ) 
+
+```
 
 ### Intra-Impact Correlations
 
