@@ -55,8 +55,6 @@ model {
  // beta_0 ~ normal(0,5); // GPR time=0 regression bias correction
  // GPR mean function
  vector[n_t] mu;
- // Flag vector for faster computation
- vector[max(n_dis)] flag_vec = rep_vector(0,max(n_dis));
  // Per country, sample from the model!
  for(iso in 1:n_isos){
    // GPR Covariance matrix
@@ -69,16 +67,19 @@ model {
    for(ttt in 1:n_t){
      // Set the disaster severity to zero at first, as well as the GPR mean function
      real dsev = 0;
-     flag_vec = to_vector(flag[iso, ttt, ])
-     if(sum(flag_vec>0){
+     // Save some computation
+     vector[n_dis[iso]] flag_vec = to_vector(flag[iso, ttt, 1:n_dis[iso]]);
+     // Sum all the contributing disaster components if there are any non-zero values
+     if(sum(flag_vec)>0){
        // Save on computation
-       vector<lower=0> iphs = to_vector(iprox[iso, ]) / hsev[to_vector(htype[iso, ])];
+       vector[n_dis[iso]] iprox_vec = to_vector(iprox[iso, 1:n_dis[iso]]);
+       vector[n_dis[iso]] iphs = iprox_vec ./ hsev[htype[iso, 1:n_dis[iso]]];
        // Calculate the disaster severity
-       dsev = sum(flag_vec*(
-         to_vector(iprox[iso, ])*to_vector(hazdur[iso, ttt,  ])*beta_dur +
-         to_vector(iprox[iso, ])*iphs*(exp(-to_vector(ts[iso,ttt, ])/iphs)-
-         exp(-(to_vector(tf[iso,ttt, ])+1)/iphs))
-         ));
+       dsev = sum(flag_vec.*(
+         iprox_vec.*to_vector(hazdur[iso, ttt, 1:n_dis[iso]])*beta_dur +
+         iprox_vec.*iphs.*(exp(-to_vector(ts[iso,ttt, 1:n_dis[iso]])./iphs)-
+         exp(-to_vector(tf[iso,ttt, 1:n_dis[iso]])./iphs)
+         )));
      }
      // // Sample the disaster impact type on crops and cattle losses
      // for(i_dis in 1:n_dis[iso]){

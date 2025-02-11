@@ -18,7 +18,9 @@ data {
   // Flag to ensure disasters do not contribute to years previous to the disaster occurrence
   array[n_isos, n_t, max(n_dis)] int <lower = 0, upper = 1> flag;
   // Time t-1 of the disaster since the end of the hazard for EOY t
-  array[n_isos, n_t, max(n_dis)] real <lower = 0> tdecay;
+  array[n_isos, n_t, max(n_dis)] real <lower = 0> ts;
+  // Time t of the disaster since the end of the hazard for EOY t
+  array[n_isos, n_t, max(n_dis)] real <lower = 0> tf;
   // Duration of the disaster post-hazard during year ttt
   array[n_isos, n_t, max(n_dis)] real <lower = 0> hazdur;
   // Hazard type of the disaster
@@ -73,24 +75,19 @@ model {
    for(ttt in 1:n_t){
      // Set the disaster severity to zero at first, as well as the GPR mean function
      real dsev = 0;
-     // Sample the disaster impact type on crops and cattle losses
-     for(i_dis in 1:n_dis[iso]){
-       // Check if the disaster comes after or before this year.
-       if(flag[iso,ttt,i_dis]!=0) {
-         // Add the hazard duration element of the disaster severity
-         dsev += iprox[iso,i_dis]*hazdur[iso, ttt, i_dis]*beta_dur;
-         // Save on computation
-         real iphs = iprox[iso,i_dis]*iprox[iso,i_dis] / hsev[htype[iso,i_dis]]; 
-         // If the hazard ended in this year, add the decay rate element of the disaster severity
-         if(tdecay[iso, ttt, i_dis]<ttt-1){
-           // Calculate the EOY disaster severity based on this disaster and add to total disaster severity for this EOY
-           dsev += iphs*(1-exp(-(ttt-tdecay[iso, ttt, i_dis])/iphs)));
-         } else {
-           real t0 = ttt-1-tdecay[iso, ttt, i_dis];
-           // Calculate the EOY disaster severity based on this disaster and add to total disaster severity for this EOY
-           dsev += iphs*(exp(-t0/iphs)-exp(-(t0+1)/iphs)));
-         }
-       } 
+     // Save some computation
+     vector[n_dis[iso]] flag_vec = to_vector(flag[iso, ttt, 1:n_dis[iso]]);
+     // Sum all the contributing disaster components if there are any non-zero values
+     if(sum(flag_vec)>0){
+       // Save on computation
+       vector[n_dis[iso]] iprox_vec = to_vector(iprox[iso, 1:n_dis[iso]]);
+       vector[n_dis[iso]] iphs = iprox_vec ./ hsev[htype[iso, 1:n_dis[iso]]];
+       // Calculate the disaster severity
+       dsev = sum(flag_vec.*(
+         iprox_vec.*to_vector(hazdur[iso, ttt, 1:n_dis[iso]])*beta_dur +
+         iprox_vec.*iphs.*(exp(-to_vector(ts[iso,ttt, 1:n_dis[iso]])./iphs)-
+         exp(-to_vector(tf[iso,ttt, 1:n_dis[iso]])./iphs)
+         )));
      }
      // Set the GPR mean function
      if (ttt == 1) {

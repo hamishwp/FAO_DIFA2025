@@ -17,15 +17,15 @@ rho <- rgamma(n_isos, shape = 2, scale = 2)   # Length-scale
 alpha <- rgamma(n_isos, shape = 2, scale = 1) # Marginal standard deviation
 # sigma <- rgamma(n_isos, shape = 2, scale = 1) # Noise scale
 # AR1 Mean Function Priors
-mu_AR1 <- rep(1.2,n_isos)# rnorm(n_isos, mean = 1.2, sd = 0.1)       # Mean AR1 trend per country
+mu_AR1 <- rep(1.05,n_isos)# rnorm(n_isos, mean = 1.2, sd = 0.1)       # Mean AR1 trend per country
 sig_AR1 <- rep(0.1,n_isos)#runif(n_isos, 0.01, 0.05)                # Standard deviation of AR1 trend
 beta_y1 <- rnorm(n_isos, mu_AR1, sig_AR1)   # AR1 mean function trend
 beta_0 <- abs(rnorm(n_isos, mean = 1000, sd = 300))       # Initial bias correction
 # Disaster Parameters
 hsev <- (1:n_haz)^2 # rgamma(n_haz, shape = 2, scale = 1)  # Hazard severity by type
 csev <- rep(0.,n_isos)#rnorm(n_isos, mean = 0, sd = 0.5)      # Country severity
-beta_dis <- -0.000001 # Disaster-severity regression coefficient
-beta_dur <- 0.0001 # Hazard duration contribution to disaster severity
+beta_dis <- -5 # Disaster-severity regression coefficient
+beta_dur <- 1. # Hazard duration contribution to disaster severity
 
 # ----- Generate Disaster Information -----
 # Hazard types per disaster 
@@ -34,8 +34,9 @@ htype <- array(0, dim = c(n_isos, max(n_dis)))
 flag <- array(0, dim = c(n_isos, n_t, max(n_dis))) 
 # Hazard duration per year
 hazdur <- array(0, dim = c(n_isos, n_t, max(n_dis))) 
-# Disaster duration per year
-tdecay <- array(0, dim = c(n_isos, n_t, max(n_dis))) 
+# Disaster duration start to end window per year
+ts <- array(0, dim = c(n_isos, n_t, max(n_dis))) 
+tf <- array(0, dim = c(n_isos, n_t, max(n_dis))) 
 # Disaster severity
 iprox <- array(0, dim = c(n_isos, max(n_dis))) 
 
@@ -53,34 +54,38 @@ for (iso in 1:n_isos) {
     duration_years <- rgamma(1,0.3,1)*htype[iso,i]  # Ensure enough space for multi-year disasters
     startprop <- runif(1,0,1) # At which proportion of the year did the disaster occur?
     end_year <- min(floor(start_year + duration_years), n_t)  # Ensure disaster doesn't exceed time range
+    endt <- start_year+startprop+duration_years
     # Set the flag for the disaster impact on EOY values
     flag[iso, start_year:n_t, i] <- 1  # Mark disaster occurrence
+    hazdur[iso, start_year, i] <- duration_years
     # Calculate the hazard and disaster duration arrays
     for (t in start_year:n_t) {
       if (t == start_year) {
         if(1-startprop>=duration_years){ # hazard lasts less than one year
-          hazdur[iso, start_year, i] <- duration_years
-          tdecay[iso, t, i] <- t-startprop-duration_years
+          ts[iso, t, i] <- 0.
+          tf[iso, t, i] <- 1-startprop-duration_years
         } else { # hazard lasts more than in the initial year
-          hazdur[iso, start_year, i] <- 1-startprop
-          tdecay[iso, t, i] <- t
+          ts[iso, t, i] <- 1
+          tf[iso, t, i] <- 1
         }
-      } else if (t < end_year){        
+      } else if (t < endt){        
         # Intermediate years: Hazard is active for the full year, no additional duration needed
-        hazdur[iso, t, i] <- 1
-        tdecay[iso, t, i] <- t  # Nothing left over in intermediate years
-      } else if (t == end_year){
+        ts[iso, t, i] <- 1
+        tf[iso, t, i] <- 1
+      } else if (t > endt & t < endt + 1){
         # Final year: Hazard ends sometime in the year
-        remaining_hazard <- duration_years - sum(hazdur[iso, start_year:(t-1), i])
-        hazdur[iso, t, i] <- min(remaining_hazard, 1)  # Ensure it doesn't exceed a full year
-        tdecay[iso, t, i] <- t - hazdur[iso, t, i]  # Remaining portion of the year
+        ts[iso, t, i] <- 0.
+        tf[iso, t, i] <- t-endt
       } else {
-        hazdur[iso, t, i] <- 0
-        tdecay[iso, t, i] <- t-1  # Full year duration for intermediate years
+        ts[iso, t, i] <- t-1-endt
+        tf[iso, t, i] <- t-endt
       }
     }
   }
 }
+
+# Quick check
+if(any(ts<0) | any(tf<0)) stop("Issues with disaster decay time start and end values")
 
 # ----- Generate GP for Each Country -----
 y <- array(0, dim = c(n_isos, n_t))  # Commodity data (final output)
@@ -97,19 +102,15 @@ for (iso in 1:n_isos) {
   # Compute disaster severity effect over time
   for (t in 1:n_t) {
     dsev <- 0
-    for (i_dis in 1:n_dis[iso]) {
-      if (flag[iso, t, i_dis] == 1) {
-        dsev <- dsev + iprox[iso, i_dis] * hazdur[iso, t, i_dis]*beta_dur
-        iphs <- iprox[iso, i_dis] / hsev[htype[i_dis]]
-        if(tdecay[iso, t, i_dis]<t-1){
-          # Calculate the EOY disaster severity based on this disaster and add to total disaster severity for this EOY
-          dsev = dsev + iprox[iso, i_dis]*iphs*(1-exp(-(t-tdecay[iso, t, i_dis])/iphs))
-        } else {
-          t0 = t-1-tdecay[iso, t, i_dis]
-          # Calculate the EOY disaster severity based on this disaster and add to total disaster severity for this EOY
-          dsev = dsev + iprox[iso, i_dis]*iphs*(exp(-t0/iphs)-exp(-(t0+1)/iphs))
-        }
-      }
+    if(sum(flag[iso,t,])>0){
+      # Save on computation
+      iphs = iprox[iso,1:n_dis[iso]] / hsev[htype[iso, 1:n_dis[iso]]]
+      # Calculate the disaster severity
+      dsev = sum(flag[iso,t,1:n_dis[iso]]*(
+        iprox[iso,1:n_dis[iso]]*hazdur[iso, t, 1:n_dis[iso]]*beta_dur +
+          iprox[iso,1:n_dis[iso]]*iphs*(exp(-ts[iso,t, 1:n_dis[iso]]/iphs)-
+                                          exp(-tf[iso,t, 1:n_dis[iso]]/iphs))
+      ))
     }
     # Compute Mean Function (GP + AR1)
     if (t == 1) {
@@ -134,7 +135,8 @@ data_list <- list(
   time = time,
   y = y,  # Transposed for Stan (column-major order)
   flag = flag,
-  tdecay = tdecay,
+  ts = ts,
+  tf = tf,
   hazdur = hazdur,
   htype = htype,
   iprox = iprox,
