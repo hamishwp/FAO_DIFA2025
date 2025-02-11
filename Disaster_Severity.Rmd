@@ -75,6 +75,13 @@ haz_Ab_lab<-c("AV"="Avalanche",
               "VO"="Volcanic Activity",
               "WV"="Wave",
               "WA"="Wave Action")
+
+haz_Ab_lab_df <- data.frame(
+  Code = names(haz_Ab_lab),
+  Hazard = as.character(haz_Ab_lab),
+  stringsAsFactors = FALSE
+)
+
 # Convert ISO3Cs to continent
 convIso3Continent<-function(iso3){
   continents<-countrycode::countrycode(sourcevar = iso3,
@@ -861,10 +868,217 @@ Economic%>%
   scale_x_log10()
     
 ```
+
 * Point plot of crop losses against economic losses by disaster type (using haz_Ab)
+```{r economics8, message=FALSE,warning=FALSE, echo=FALSE}
+
+Economic%>%
+  left_join(
+    haz_Ab_lab_df,
+    by = c("haz_Ab" = "Code")
+  )%>%
+  ggplot(
+    aes(
+      x = damages_in_crops_ha,
+      y = USD_2017
+    )
+  ) +
+      geom_point(colour = "black", size = 2,alpha=0.3) +
+      geom_hline(yintercept = 0, colour = "red", size = 1, alpha = 0.7) +
+      labs(
+        x = "Lost ha. (crops)",
+        y = "Monetary losses (2017 USD)",
+        title = "Lost ha. vs monetary losses on agriculture due to disasters"
+      ) +
+      scale_y_continuous(
+        labels = function(x) paste0(x / 1e9, " bill.")
+      ) +
+      theme(
+        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        legend.position = "none"
+      )+facet_wrap(~Hazard) 
+    
+Economic%>%
+  left_join(
+    haz_Ab_lab_df,
+    by = c("haz_Ab" = "Code")
+  )%>%
+  ggplot(
+    aes(
+      x = damages_in_crops_ha,
+      y = USD_2017
+    )
+  ) +
+      geom_point(colour = "black", size = 2,alpha=0.3) +
+      geom_hline(yintercept = 0, colour = "red", size = 1, alpha = 0.7) +
+      labs(
+        x = "Log(Lost ha. (crops))",
+        y = "Log(Monetary losses (2017 USD))",
+        title = "Lost ha. vs monetary losses on agriculture due to disasters",
+        subtitle = "Logarithmic scale"
+      ) +
+      theme(
+        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        legend.position = "none"
+      )+
+  scale_y_log10()+
+  scale_x_log10()+
+  geom_smooth(colour = "red",se=FALSE)+
+  facet_wrap(~Hazard)
+```
 * Point plot of crop losses against economic losses by  UN regions
+
+```{r economics9, message=FALSE,warning=FALSE, echo=FALSE}
+
+Economic%>%
+  left_join(
+    IsoContinentRegion%>%
+      rename(
+        Region = 'UN Region',
+        ISO3 = 'ISO Code'
+      )%>%
+      select(
+        Region,
+        ISO3
+      ),
+    by = "ISO3"
+  )%>%
+  ggplot(
+    aes(
+      x = damages_in_crops_ha,
+      y = USD_2017
+    )
+  ) +
+      geom_point(colour = "black", size = 2,alpha=0.3) +
+      geom_hline(yintercept = 0, colour = "red", size = 1, alpha = 0.7) +
+      labs(
+        x = "Lost ha. (crops)",
+        y = "Monetary losses (2017 USD)",
+        title = "Lost ha. vs monetary losses on agriculture due to disasters"
+      ) +
+      scale_y_continuous(
+        labels = function(x) paste0(x / 1e9, " bill.")
+      ) +
+      theme(
+        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        legend.position = "none"
+      )+facet_wrap(~Region) 
+    
+Economic%>%
+  left_join(
+    IsoContinentRegion%>%
+      rename(
+        Region = 'UN Region',
+        ISO3 = 'ISO Code'
+      )%>%
+      select(
+        Region,
+        ISO3
+      ),
+    by = "ISO3"
+  )%>%
+  ggplot(
+    aes(
+      x = damages_in_crops_ha,
+      y = USD_2017
+    )
+  ) +
+      geom_point(colour = "black", size = 2,alpha=0.3) +
+      geom_hline(yintercept = 0, colour = "red", size = 1, alpha = 0.7) +
+      labs(
+        x = "Log(Lost ha. (crops))",
+        y = "Log(Monetary losses (2017 USD))",
+        title = "Lost ha. vs monetary losses on agriculture due to disasters",
+        subtitle = "Logarithmic scale"
+      ) +
+      theme(
+        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        legend.position = "none"
+      )+
+  scale_y_log10()+
+  scale_x_log10()+
+  geom_smooth(colour = "red",se=FALSE)+
+  facet_wrap(~Region) 
+```
+
 * Table of adj-R-squared values of all impact types against crop losses by disaster type (using haz_Ab), include sample size
+
+```{r Rsq, message=FALSE,warning=FALSE, echo=FALSE}
+adj_r2_table <- Economic %>%
+  group_by(haz_Ab) %>%
+  summarise(
+    n = n(),  
+    adj_r2 = ifelse(n() > 1, summary(lm(USD_2017 ~ damages_in_crops_ha))$adj.r.squared, NA_real_)
+  ) %>%
+  arrange(desc(adj_r2)) 
+
+adj_r2_table%>%
+kableExtra::kable(col.names = c("Abbreviated Hazard","Sample size","R2-Adj"))
+```
+
 * Table of adj-R-squared values of all impact types against crop losses by UN region, include sample size
+```{r Rsq2, message=FALSE,warning=FALSE, echo=FALSE}
+adj_r2_table2 <- Economic %>%
+  left_join(
+    IsoContinentRegion%>%
+      rename(
+        Region = 'UN Region',
+        ISO3 = 'ISO Code'
+      )%>%
+      select(
+        Region,
+        ISO3
+      ),
+    by = "ISO3"
+  )%>%
+  group_by(Region) %>%
+  summarise(
+    n = n(),  
+    adj_r2 = ifelse(n() > 1, summary(lm(USD_2017 ~ damages_in_crops_ha))$adj.r.squared, NA_real_)
+  ) %>%
+  arrange(desc(adj_r2)) 
+
+adj_r2_table2%>%
+kableExtra::kable(col.names = c("UN Region","Sample size","R2-Adj"))
+```
+
+* Table of adj-R-squared values of all impact types against crop losses by UN region (IN LOGARITHM), include sample size
+```{r Rsq2log, message=FALSE,warning=FALSE, echo=FALSE}
+adj_r2_table2 <- Economic %>%
+  left_join(
+    IsoContinentRegion%>%
+      rename(
+        Region = 'UN Region',
+        ISO3 = 'ISO Code'
+      )%>%
+      select(
+        Region,
+        ISO3
+      ),
+    by = "ISO3"
+  )%>%
+  group_by(Region) %>%
+  summarise(
+    n = n(),  
+    adj_r2 = ifelse(n() > 1, summary(lm(log(USD_2017) ~ log(damages_in_crops_ha)))$adj.r.squared, NA_real_)
+  ) %>%
+  arrange(desc(adj_r2)) 
+
+adj_r2_table2%>%
+kableExtra::kable(col.names = c("UN Region","Sample size","R2-Adj"))
+```
 * All of the above but for cattle losses instead of crop losses
 * Re-group certain hazards based on differences and then make a table of adj-R-squared values of all impact types against crop losses by grouped disaster types, include sample size
 * Normalise the crop losses in the Desinventar database with the productive cropland area from FAOSTAT, then re-calculate the hazard type (using haz_Ab) adj-R-squared values, make table
