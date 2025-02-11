@@ -32,6 +32,7 @@ h3.subtitle {
 ```{r setup, include=FALSE}
 # Setup the local environment
 source("./RCode/Setup/GetPackages.R")
+source("./RCode/Data_Wrangling/GetFAOSTAT.R")
 # Some extras for nice and neat tables
 knitr::opts_chunk$set(echo = TRUE)
 options(kableExtra.latex.load_packages = FALSE,
@@ -505,10 +506,361 @@ dessie%>%
 Now we need to analyse the correlation between different impact types, grouping them wherever possible to ensure sufficient sample sizes. When plotting economic losses, please plot the impact estimated in USD and not the local/unknown currency.
 
 ```{r economics, message=FALSE,warning=FALSE, echo=FALSE}
+# We need to convert LCU to USD and then, deflate USD values to 2017.
 
+ER <- GetFAOSTAT_ER(1990,NULL)
+CPI_USD_2017 <- GetCPI_USA(1990,NULL)
+
+Economic <- dessie%>%
+  mutate(
+    Year = lubridate::year(date),
+    Year = case_when(
+      Year == 2103 ~ 2013,
+      Year == 2104 ~ 2014,
+      Year == 2202 ~ 2022,
+      TRUE ~ Year
+    )
+  )%>%
+  filter(
+    Year >= 1990
+  )%>%
+  left_join(
+    ER,
+    by = c("ISO3" = "ISO3.CODE","Year" = "Year")
+  )%>%
+  left_join(
+    CPI_USD_2017,
+    by = "Year"
+  )%>%
+  mutate(
+    USD_2017 = case_when(
+      !is.na(losses_in_dollar) ~ losses_in_dollar/CPI_2017,
+      is.na(losses_in_dollar) & !is.na(losses_local_currency) ~ losses_local_currency/(CPI_2017*ER),
+      TRUE ~ NA
+    )
+  )%>%
+  filter(
+    !is.na(USD_2017)
+  )
 ```
 
+From the 40072 registers recorder from 1990 onwards, 4198 have economic losses data.
+
 * Point plot of crop losses against: deaths, economic losses, directly affected, indirectly affected, injured and missing
+
+```{r economics2, message=FALSE,warning=FALSE, echo=FALSE}
+
+Economic%>%
+  ggplot(
+    aes(
+      x = damages_in_crops_ha,
+      y = USD_2017
+    )
+  ) +
+      geom_point(colour = "black", size = 2,alpha=0.3) +
+      geom_hline(yintercept = 0, colour = "red", size = 1, alpha = 0.7) +
+      labs(
+        x = "Lost ha. (crops)",
+        y = "Monetary losses (2017 USD)",
+        title = "Lost ha. vs monetary losses on agriculture due to disasters"
+      ) +
+      scale_y_continuous(
+        labels = function(x) paste0(x / 1e9, " bill.")
+      ) +
+      theme(
+        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        legend.position = "none"
+      ) 
+    
+Economic%>%
+  ggplot(
+    aes(
+      x = damages_in_crops_ha,
+      y = USD_2017
+    )
+  ) +
+      geom_point(colour = "black", size = 2,alpha=0.3) +
+      geom_hline(yintercept = 0, colour = "red", size = 1, alpha = 0.7) +
+      labs(
+        x = "Log(Lost ha. (crops))",
+        y = "Log(Monetary losses (2017 USD))",
+        title = "Lost ha. vs monetary losses on agriculture due to disasters",
+        subtitle = "Logarithmic scale"
+      ) +
+      theme(
+        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        legend.position = "none"
+      )+
+  scale_y_log10()+
+  scale_x_log10()+
+  geom_smooth(colour = "red",se=FALSE)
+```
+
+```{r economics3, message=FALSE,warning=FALSE, echo=FALSE}
+
+Economic%>%
+  ggplot(
+    aes(
+      x = damages_in_crops_ha,
+      y = deaths
+    )
+  ) +
+      geom_point(colour = "black", size = 2,alpha=0.3) +
+      geom_hline(yintercept = 0, colour = "red", size = 1, alpha = 0.7) +
+      labs(
+        x = "Lost ha. (crops)",
+        y = "Deaths",
+        title = "Lost ha. vs number of deaths"
+      ) +
+      theme(
+        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        legend.position = "none"
+      ) 
+    
+
+Economic%>%
+  ggplot(
+    aes(
+      x = damages_in_crops_ha,
+      y = deaths
+    )
+  ) +
+      geom_point(colour = "black", size = 2,alpha=0.3) +
+      geom_hline(yintercept = 0, colour = "red", size = 1, alpha = 0.7) +
+      labs(
+        x = "Log(Lost ha. (crops))",
+        y = "Log(Deaths)",
+        subtitle = "Logarithmic scale",
+        title = "Lost ha. vs number of deaths"
+      ) +
+      theme(
+        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        legend.position = "none"
+      ) +
+    scale_y_log10()+
+  scale_x_log10()
+    
+```
+```{r economics4, message=FALSE,warning=FALSE, echo=FALSE}
+
+Economic%>%
+  ggplot(
+    aes(
+      x = damages_in_crops_ha,
+      y = directly_affected
+    )
+  ) +
+      geom_point(colour = "black", size = 2,alpha=0.3) +
+      geom_hline(yintercept = 0, colour = "red", size = 1, alpha = 0.7) +
+      labs(
+        x = "Lost ha. (crops)",
+        y = "directly affected",
+        title = "Lost ha. vs directly affected"
+      ) +
+      theme(
+        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        legend.position = "none"
+      ) 
+    
+
+Economic%>%
+  ggplot(
+    aes(
+      x = damages_in_crops_ha,
+      y = directly_affected
+    )
+  ) +
+      geom_point(colour = "black", size = 2,alpha=0.3) +
+      geom_hline(yintercept = 0, colour = "red", size = 1, alpha = 0.7) +
+      labs(
+        x = "Log(Lost ha. (crops))",
+        y = "Log(directly affected)",
+        subtitle = "Logarithmic scale",
+        title = "Lost ha. vs directly affected"
+      ) +
+      theme(
+        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        legend.position = "none"
+      ) +
+    scale_y_log10()+
+  scale_x_log10()+
+  geom_smooth(colour = "red",se = FALSE)
+    
+```
+```{r economics5, message=FALSE,warning=FALSE, echo=FALSE}
+
+Economic%>%
+  ggplot(
+    aes(
+      x = damages_in_crops_ha,
+      y = indirectly_affected
+    )
+  ) +
+      geom_point(colour = "black", size = 2,alpha=0.3) +
+      geom_hline(yintercept = 0, colour = "red", size = 1, alpha = 0.7) +
+      labs(
+        x = "Lost ha. (crops)",
+        y = "indirectly affected",
+        title = "Lost ha. vs indirectly affected"
+      ) +
+      theme(
+        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        legend.position = "none"
+      ) 
+    
+
+Economic%>%
+  ggplot(
+    aes(
+      x = damages_in_crops_ha,
+      y = indirectly_affected
+    )
+  ) +
+      geom_point(colour = "black", size = 2,alpha=0.3) +
+      geom_hline(yintercept = 0, colour = "red", size = 1, alpha = 0.7) +
+      labs(
+        x = "Log(Lost ha. (crops))",
+        y = "Log(indirectly affected)",
+        subtitle = "Logarithmic scale",
+        title = "Lost ha. vs indirectly affected"
+      ) +
+      theme(
+        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        legend.position = "none"
+      ) +
+    scale_y_log10()+
+  scale_x_log10()+
+  geom_smooth(colour = "red",se = FALSE)
+    
+```
+```{r economics6, message=FALSE,warning=FALSE, echo=FALSE}
+
+Economic%>%
+  ggplot(
+    aes(
+      x = damages_in_crops_ha,
+      y = injured
+    )
+  ) +
+      geom_point(colour = "black", size = 2,alpha=0.3) +
+      geom_hline(yintercept = 0, colour = "red", size = 1, alpha = 0.7) +
+      labs(
+        x = "Lost ha. (crops)",
+        y = "injured",
+        title = "Lost ha. vs injured"
+      ) +
+      theme(
+        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        legend.position = "none"
+      ) 
+    
+
+Economic%>%
+  ggplot(
+    aes(
+      x = damages_in_crops_ha,
+      y = injured
+    )
+  ) +
+      geom_point(colour = "black", size = 2,alpha=0.3) +
+      geom_hline(yintercept = 0, colour = "red", size = 1, alpha = 0.7) +
+      labs(
+        x = "Log(Lost ha. (crops))",
+        y = "Log(injured)",
+        subtitle = "Logarithmic scale",
+        title = "Lost ha. vs injured"
+      ) +
+      theme(
+        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        legend.position = "none"
+      ) +
+    scale_y_log10()+
+  scale_x_log10()+
+  geom_smooth(colour = "red",se = FALSE)
+    
+```
+
+```{r economics7, message=FALSE,warning=FALSE, echo=FALSE}
+
+Economic%>%
+  ggplot(
+    aes(
+      x = damages_in_crops_ha,
+      y = missing
+    )
+  ) +
+      geom_point(colour = "black", size = 2,alpha=0.3) +
+      geom_hline(yintercept = 0, colour = "red", size = 1, alpha = 0.7) +
+      labs(
+        x = "Lost ha. (crops)",
+        y = "missing",
+        title = "Lost ha. vs missing"
+      ) +
+      theme(
+        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        legend.position = "none"
+      ) 
+    
+
+Economic%>%
+  ggplot(
+    aes(
+      x = damages_in_crops_ha,
+      y = missing
+    )
+  ) +
+      geom_point(colour = "black", size = 2,alpha=0.3) +
+      geom_hline(yintercept = 0, colour = "red", size = 1, alpha = 0.7) +
+      labs(
+        x = "Log(Lost ha. (crops))",
+        y = "Log(missing)",
+        subtitle = "Logarithmic scale",
+        title = "Lost ha. vs missing"
+      ) +
+      theme(
+        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        legend.position = "none"
+      ) +
+    scale_y_log10()+
+  scale_x_log10()
+    
+```
 * Point plot of crop losses against economic losses by disaster type (using haz_Ab)
 * Point plot of crop losses against economic losses by  UN regions
 * Table of adj-R-squared values of all impact types against crop losses by disaster type (using haz_Ab), include sample size
