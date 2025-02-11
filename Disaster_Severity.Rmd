@@ -1080,6 +1080,394 @@ adj_r2_table2%>%
 kableExtra::kable(col.names = c("UN Region","Sample size","R2-Adj"))
 ```
 * All of the above but for cattle losses instead of crop losses
+
+* Point plot of crop losses against: deaths, economic losses, directly affected, indirectly affected, injured and missing
+
+```{r economics2b, message=FALSE,warning=FALSE, echo=FALSE}
+
+Economic%>%
+  ggplot(
+    aes(
+      x = lost_cattle,
+      y = USD_2017
+    )
+  ) +
+      geom_point(colour = "black", size = 2,alpha=0.3) +
+      geom_hline(yintercept = 0, colour = "red", size = 1, alpha = 0.7) +
+      labs(
+        x = "Lost cattle",
+        y = "Monetary losses (2017 USD)",
+        title = "Lost cattle vs monetary losses on agriculture due to disasters"
+      ) +
+      scale_y_continuous(
+        labels = function(x) paste0(x / 1e9, " bill.")
+      ) +
+      theme(
+        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        legend.position = "none"
+      ) 
+    
+Economic%>%
+  ggplot(
+    aes(
+      x = lost_cattle,
+      y = USD_2017
+    )
+  ) +
+      geom_point(colour = "black", size = 2,alpha=0.3) +
+      geom_hline(yintercept = 0, colour = "red", size = 1, alpha = 0.7) +
+      labs(
+        x = "Log(Lost cattle)",
+        y = "Log(Monetary losses (2017 USD))",
+        title = "Lost cattle vs monetary losses on agriculture due to disasters",
+        subtitle = "Logarithmic scale"
+      ) +
+      theme(
+        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        legend.position = "none"
+      )+
+  scale_y_log10()+
+  scale_x_log10()+
+  geom_smooth(colour = "red",se=FALSE)
+```
+
+```{r economics3b, message=FALSE,warning=FALSE, echo=FALSE}
+
+Economic%>%
+  ggplot(
+    aes(
+      x = lost_cattle,
+      y = deaths
+    )
+  ) +
+      geom_point(colour = "black", size = 2,alpha=0.3) +
+      geom_hline(yintercept = 0, colour = "red", size = 1, alpha = 0.7) +
+      labs(
+        x = "Lost cattle",
+        y = "Deaths",
+        title = "Lost cattle vs number of deaths"
+      ) +
+      theme(
+        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        legend.position = "none"
+      ) 
+    
+
+Economic%>%
+  ggplot(
+    aes(
+      x = lost_cattle,
+      y = deaths
+    )
+  ) +
+      geom_point(colour = "black", size = 2,alpha=0.3) +
+      geom_hline(yintercept = 0, colour = "red", size = 1, alpha = 0.7) +
+      labs(
+        x = "Log(Lost cattle)",
+        y = "Log(Deaths)",
+        subtitle = "Logarithmic scale",
+        title = "Lost cattle vs number of deaths"
+      ) +
+      theme(
+        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        legend.position = "none"
+      ) +
+    scale_y_log10()+
+  scale_x_log10()
+    
+```
+```{r economics4b, message=FALSE,warning=FALSE, echo=FALSE}
+
+Economic%>%
+  ggplot(
+    aes(
+      x = lost_cattle,
+      y = directly_affected
+    )
+  ) +
+      geom_point(colour = "black", size = 2,alpha=0.3) +
+      geom_hline(yintercept = 0, colour = "red", size = 1, alpha = 0.7) +
+      labs(
+        x = "Lost cattle",
+        y = "directly affected",
+        title = "Lost cattle vs directly affected"
+      ) +
+      theme(
+        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        legend.position = "none"
+      ) 
+    
+
+Economic%>%
+  ggplot(
+    aes(
+      x = lost_cattle,
+      y = directly_affected
+    )
+  ) +
+      geom_point(colour = "black", size = 2,alpha=0.3) +
+      geom_hline(yintercept = 0, colour = "red", size = 1, alpha = 0.7) +
+      labs(
+        x = "Log(Lost cattle)",
+        y = "Log(directly affected)",
+        subtitle = "Logarithmic scale",
+        title = "Lost cattle vs directly affected"
+      ) +
+      theme(
+        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        legend.position = "none"
+      ) +
+    scale_y_log10()+
+  scale_x_log10()+
+  geom_smooth(colour = "red",se = FALSE)
+    
+```
+```{r economics5b, message=FALSE,warning=FALSE, echo=FALSE}
+
+Economic%>%
+  ggplot(
+    aes(
+      x = lost_cattle,
+      y = indirectly_affected
+    )
+  ) +
+      geom_point(colour = "black", size = 2,alpha=0.3) +
+      geom_hline(yintercept = 0, colour = "red", size = 1, alpha = 0.7) +
+      labs(
+        x = "Lost cattle",
+        y = "indirectly affected",
+        title = "Lost cattle vs indirectly affected"
+      ) +
+      theme(
+        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        legend.position = "none"
+      ) 
+    
+
+Economic%>%
+  ggplot(
+    aes(
+      x = lost_cattle,
+      y = indirectly_affected
+    )
+  ) +
+      geom_point(colour = "black", size = 2,alpha=0.3) +
+      geom_hline(yintercept = 0, colour = "red", size = 1, alpha = 0.7) +
+      labs(
+        x = "Log(Lost cattle (crops))",
+        y = "Log(indirectly affected)",
+        subtitle = "Logarithmic scale",
+        title = "Lost cattle vs indirectly affected"
+      ) +
+      theme(
+        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        legend.position = "none"
+      ) +
+    scale_y_log10()+
+  scale_x_log10()+
+  geom_smooth(colour = "red",se = FALSE)
+    
+```
+```{r economics6b, message=FALSE,warning=FALSE, echo=FALSE}
+
+Economic%>%
+  ggplot(
+    aes(
+      x = lost_cattle,
+      y = injured
+    )
+  ) +
+      geom_point(colour = "black", size = 2,alpha=0.3) +
+      geom_hline(yintercept = 0, colour = "red", size = 1, alpha = 0.7) +
+      labs(
+        x = "Lost cattle",
+        y = "injured",
+        title = "Lost cattle vs injured"
+      ) +
+      theme(
+        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        legend.position = "none"
+      ) 
+    
+
+Economic%>%
+  ggplot(
+    aes(
+      x = lost_cattle,
+      y = injured
+    )
+  ) +
+      geom_point(colour = "black", size = 2,alpha=0.3) +
+      geom_hline(yintercept = 0, colour = "red", size = 1, alpha = 0.7) +
+      labs(
+        x = "Log(Lost cattle)",
+        y = "Log(injured)",
+        subtitle = "Logarithmic scale",
+        title = "Lost cattle vs injured"
+      ) +
+      theme(
+        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        legend.position = "none"
+      ) +
+    scale_y_log10()+
+  scale_x_log10()+
+  geom_smooth(colour = "red",se = FALSE)
+    
+```
+
+```{r economics7b, message=FALSE,warning=FALSE, echo=FALSE}
+
+Economic%>%
+  ggplot(
+    aes(
+      x = lost_cattle,
+      y = missing
+    )
+  ) +
+      geom_point(colour = "black", size = 2,alpha=0.3) +
+      geom_hline(yintercept = 0, colour = "red", size = 1, alpha = 0.7) +
+      labs(
+        x = "Lost cattle",
+        y = "missing",
+        title = "Lost cattle vs missing"
+      ) +
+      theme(
+        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        legend.position = "none"
+      ) 
+    
+
+Economic%>%
+  ggplot(
+    aes(
+      x = lost_cattle,
+      y = missing
+    )
+  ) +
+      geom_point(colour = "black", size = 2,alpha=0.3) +
+      geom_hline(yintercept = 0, colour = "red", size = 1, alpha = 0.7) +
+      labs(
+        x = "Log(Lost cattle)",
+        y = "Log(missing)",
+        subtitle = "Logarithmic scale",
+        title = "Lost cattle vs missing"
+      ) +
+      theme(
+        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
+        axis.text = element_text(family = "Arial", size = 10),
+        axis.title = element_text(family = "Arial", size = 11),
+        axis.line = element_line(color = "black"),
+        legend.position = "none"
+      ) +
+    scale_y_log10()+
+  scale_x_log10()
+    
+```
+
+* Table of adj-R-squared values of all impact types against crop losses by disaster type (using haz_Ab), include sample size
+
+```{r Rsqb, message=FALSE,warning=FALSE, echo=FALSE}
+adj_r2_table <- Economic %>%
+  group_by(haz_Ab) %>%
+  filter(sum(!is.na(USD_2017) & !is.na(lost_cattle)) > 1)%>% 
+  summarise(
+    n = n(),  
+    adj_r2 = ifelse(n() > 1, summary(lm(USD_2017 ~ lost_cattle))$adj.r.squared, NA_real_)
+  ) %>%
+  arrange(desc(adj_r2)) 
+
+adj_r2_table%>%
+kableExtra::kable(col.names = c("Abbreviated Hazard","Sample size","R2-Adj"))
+```
+
+
+* Table of adj-R-squared values of all impact types against crop losses by UN region, include sample size
+```{r Rsq2b, message=FALSE,warning=FALSE, echo=FALSE}
+adj_r2_table2 <- Economic %>%
+  left_join(
+    IsoContinentRegion%>%
+      rename(
+        Region = 'UN Region',
+        ISO3 = 'ISO Code'
+      )%>%
+      select(
+        Region,
+        ISO3
+      ),
+    by = "ISO3"
+  )%>%
+  group_by(Region) %>%
+  summarise(
+    n = n(),  
+    adj_r2 = ifelse(n() > 1, summary(lm(USD_2017 ~ lost_cattle))$adj.r.squared, NA_real_)
+  ) %>%
+  arrange(desc(adj_r2)) 
+
+adj_r2_table2%>%
+kableExtra::kable(col.names = c("UN Region","Sample size","R2-Adj"))
+```
+
+
+* Table of adj-R-squared values of all impact types against crop losses by UN region (IN LOGARITHM), include sample size
+```{r Rsq2logb, message=FALSE,warning=FALSE, echo=FALSE}
+adj_r2_table2 <- Economic %>%
+  left_join(
+    IsoContinentRegion%>%
+      rename(
+        Region = 'UN Region',
+        ISO3 = 'ISO Code'
+      )%>%
+      select(
+        Region,
+        ISO3
+      ),
+    by = "ISO3"
+  )%>%
+  group_by(Region) %>%
+  summarise(
+    n = n(),  
+    adj_r2 = ifelse(n() > 1, summary(lm(log(USD_2017) ~ log(lost_cattle)))$adj.r.squared, NA_real_)
+  ) %>%
+  arrange(desc(adj_r2)) 
+
+adj_r2_table2%>%
+kableExtra::kable(col.names = c("UN Region","Sample size","R2-Adj"))
+```
+
+
 * Re-group certain hazards based on differences and then make a table of adj-R-squared values of all impact types against crop losses by grouped disaster types, include sample size
 * Normalise the crop losses in the Desinventar database with the productive cropland area from FAOSTAT, then re-calculate the hazard type (using haz_Ab) adj-R-squared values, make table
 * Same as above but with grouped-hazard types, trying different grouping methods
