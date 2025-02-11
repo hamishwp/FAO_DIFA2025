@@ -36,7 +36,7 @@ parameters {
   // Disaster parameters
   vector<lower=0>[n_haz] hsev; // Hazard severity, per hazard type
   real beta_dis; // Disaster-severity regression coefficient
-  real beta_dur; // Hazard duration regression coefficient
+  real <lower=0>beta_dur; // Hazard duration regression coefficient
   // GPR covariance parameters
   vector<lower=0>[n_isos] rho; // GPR length-scale
   vector<lower=0>[n_isos] alpha; // GPR marginal standard-deviation
@@ -50,7 +50,7 @@ model {
  rho ~ gamma(2,2); // GPR length-scale
  alpha ~ gamma(2,1); // GPR marginal standard-deviation
  beta_dis ~ normal(0,20); // Disaster-severity regression coefficient
- beta_dur ~ normal(0,5); // Hazard duration coefficient
+ beta_dur ~ gamma(2,1); // Hazard duration coefficient
  beta_y1 ~ normal(mu_AR1, sig_AR1); // GPR AR1 mean function coefficient - empirical Bayes
  // beta_0 ~ normal(0,5); // GPR time=0 regression bias correction
  // GPR mean function
