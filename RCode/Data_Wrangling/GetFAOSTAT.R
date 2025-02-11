@@ -440,3 +440,71 @@ GetModelProduction<-function(syear=1990,fyear=NULL){
   return(Model_Data)
 
 }
+
+GetFAOSTAT_ER<-function(syear=1990,fyear=NULL){
+  # Set the upper limit for the year
+  if(is.null(fyear)) fyear<-AsYear(Sys.Date())
+  # FAOSTAT data extract link
+  URL<-"https://bulks-faostat.fao.org/production/Exchange_rate_E_All_Data.zip"
+  # Where to store it to
+  outloc<-"./Data/RawData/Exchange_rate_E_All_Data.zip"
+  # Download it and save it out
+  download.file(URL,outloc)
+  # Unzip it
+  unzip(outloc,exdir = str_split(outloc,".zip",simplify = T)[1,1])
+  
+  ER <- read.csv("./Data/RawData/Exchange_rate_E_All_Data/Exchange_rate_E_All_Data.csv")%>%
+    select(
+      -matches(
+        "F$|N$"
+      )
+    )%>%
+    pivot_longer(
+      cols = starts_with("Y"), 
+      names_to = "Year",   
+      values_to = "Value"  
+    )%>%
+    mutate(
+      Year = as.numeric(str_remove(Year, "^Y"))
+    )%>%
+    filter(
+      Element == "Local currency units per USD",
+      Months == "Annual value",
+      !is.na(Value)
+    )%>%
+    mutate(
+      Area.Code = Area.Code,
+      codenew_I = case_when( #We change Area.Code so this countries corresponds to the ones they became later (see below)
+        Area.Code == 62 ~ 238,
+        Area.Code == 277 ~ 276,
+        Area.Code == 15 ~ 255,
+        TRUE ~ Area.Code
+      ),
+      codenew_II = countrycode(
+        codenew_I, 
+        origin = "fao",
+        destination = "iso3c"
+      ),
+      ISO3.CODE = case_when(
+        Area == "Belgium-Luxembourg" ~ "BLX",
+        Area == "China, mainland" ~ "CHN",
+        Area == "Czechoslovakia" ~ "CSK",
+        Area == "Palestine" ~ "PSE",
+        Area == "Serbia and Montenegro" ~ "SCG",
+        Area == "USSR" ~ "SUN",
+        Area== "Yugoslav SFR" ~ "YUG",
+        Area == "South Sudan" ~ "SSN", #Former code states that countrycodes was not differentiating between sudan and south sudan, we do it manually
+        TRUE ~ codenew_II
+      )
+    )%>%
+    transmute(
+      Year,
+      ISO3.CODE,
+      ER = Value
+    )%>%
+    filter(
+      !is.na(ISO3.CODE),
+      Year >= syear,
+      Year <= fyear
+    )
+}

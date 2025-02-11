@@ -504,6 +504,10 @@ dessie%>%
 
 Now we need to analyse the correlation between different impact types, grouping them wherever possible to ensure sufficient sample sizes. When plotting economic losses, please plot the impact estimated in USD and not the local/unknown currency.
 
+```{r economics, message=FALSE,warning=FALSE, echo=FALSE}
+
+```
+
 * Point plot of crop losses against: deaths, economic losses, directly affected, indirectly affected, injured and missing
 * Point plot of crop losses against economic losses by disaster type (using haz_Ab)
 * Point plot of crop losses against economic losses by  UN regions
