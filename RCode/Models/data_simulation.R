@@ -47,7 +47,7 @@ for (iso in 1:n_isos) {
   # Which hazard type was the disaster (nominal data)
   htype[iso,] <- sample(1:n_haz, max(n_dis), replace = TRUE)
   # Generate the disaster severity
-  iprox[iso, ] <- rgamma(max(n_dis), shape = 1, scale = 1)  # Random disaster severity
+  iprox[iso, ] <- rgamma(max(n_dis), shape = 2, scale = 0.5)  # Random disaster severity
   # Estimate how long each disaster has an impact on the countries production
   for (i in 1:n_dis[iso]) {
     start_year <- dis_years[i]
@@ -154,20 +154,26 @@ options(mc.cores = floor(0.8*parallel::detectCores()))
 rstan_options(auto_write = TRUE)
 
 # ----- Compile Stan Model -----
-stan_model_code <- "./RCode/Models/DIFA2025_redredDisSev.stan"  # Specify your Stan model path
+# stan_model_code <- "./RCode/Models/DIFA2025_redredDisSev.stan"  # Specify your Stan model path
+stan_model_code <- "./RCode/Models/DIFA2025.stan"  # Specify your Stan model path
+if(grepl("DIFA2025.stan",stan_model_code)) {
+  data_list$alpha_dis<-array(2,dim = c(n_isos,max(n_dis)))
+  data_list$lambda_dis<-array(0.1,dim = c(n_isos,max(n_dis)))
+}
+  
 stan_model <- stan_model(stan_model_code)
 
 # ----- MCMC Sampling -----
 mcmc_results <- sampling(
   object = stan_model, 
   data = data_list, 
-  chains = 4, 
-  iter = 2000, 
+  chains = 8, 
+  iter = 3500, 
   # thin = 4,
-  warmup = 1000, 
+  warmup = 1500, 
   seed = 42,
   control = list(adapt_delta = 0.95, max_treedepth=15),
-  sample_file="./Data/Results/Simulations/DIFA2025_redredDisSev.csv"
+  sample_file="./Data/Results/Simulations/DIFA2025.csv"
 )
 print(mcmc_results)
 

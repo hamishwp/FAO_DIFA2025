@@ -26,9 +26,9 @@ data {
   // Hazard type of the disaster
   array[n_isos, max(n_dis)] int <lower = 0> htype;
   // (Gamma) Shape value of disaster severity, per disaster
-  array[n_isos, n_dis] real<lower=0> alpha_dis;
+  array[n_isos, max(n_dis)] real<lower=0> alpha_dis;
   // (Gamma) Rate of disaster severity, per disaster
-  array[n_isos, n_dis] real<lower=0> lambda_dis;
+  array[n_isos, max(n_dis)] real<lower=0> lambda_dis;
   // Mean AR1 trend in commodity data, per country
   vector[n_isos] mu_AR1;
   // Standard deviation in AR1 trend in commodity data, per country
@@ -38,7 +38,7 @@ data {
 parameters {
   // Disaster parameters
   vector<lower=0>[n_haz] hsev; // Hazard severity, per hazard type
-  vector[n_isos] csev; //  Country severity
+  // vector[n_isos] csev; //  Country severity
   real beta_dis; // Disaster-severity regression coefficient
   real<lower=0> beta_dur; // Hazard duration regression coefficient
   array[n_isos] vector<lower=0>[max(n_dis)] iprox; // Disaster-specific severity
@@ -52,25 +52,24 @@ parameters {
 model {
  // Priors
  hsev ~ gamma(2,1); // Hazard severity
- csev ~ normal(0,1); // Country severity
+ // csev ~ normal(0,1); // Country severity
+ vector[n_isos] csev = rep_vector(0,n_isos);
  rho ~ gamma(2,2); // GPR length-scale
  alpha ~ gamma(2,1); // GPR marginal standard-deviation
  beta_dis ~ normal(0,5); // Disaster-severity regression coefficient
  beta_dur ~ gamma(2,1); // Hazard duration coefficient
- beta_y1 ~ normal(mu_AR1, 3*sig_AR1); // GPR AR1 mean function coefficient - empirical Bayes
+ beta_y1 ~ normal(mu_AR1, sig_AR1); // GPR AR1 mean function coefficient - empirical Bayes
  // beta_0 ~ normal(0,5); // GPR time=0 regression bias correction
  // GPR mean function
- vector[n_t] mu;
+ vector[n_t] mu = rep_vector(0, n_t);
  // Per country, sample from the model!
  for(iso in 1:n_isos){
    // GPR Covariance matrix
    matrix[n_t, n_t] K = add_diag(gp_exp_quad_cov(time, alpha[iso], rho[iso]),1e-6);
    // Decompose the GPR covariance matrix
    matrix[n_t, n_t] L_K = cholesky_decompose(K);
-   // Set the GPR mean function to zero
-   mu = rep_vector(0, n_t);
    // Sample the estimated impact value in crop losses = impact proxy
-   iprox[iso,] ~ gamma(alpha_dis[iso, 1:max(n_dis)], lambda_dis[iso, 1:max(n_dis)]);
+   iprox[iso,1:n_dis[iso]] ~ gamma(alpha_dis[iso, 1:n_dis[iso]], lambda_dis[iso, 1:n_dis[iso]]);
    // Sample through the EOY values
    for(ttt in 1:n_t){
      // Set the disaster severity to zero at first, as well as the GPR mean function
@@ -100,3 +99,8 @@ model {
    y[iso,] ~ multi_normal_cholesky(mu, L_K);
  }
 }
+
+
+
+
+
