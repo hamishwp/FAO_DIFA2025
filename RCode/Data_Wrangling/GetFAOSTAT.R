@@ -6,6 +6,7 @@ GetFAOSTAT_All<-function(syear=1990,fyear=NULL){
   
   return(list(yield = FAOSTAT$yield_data,
               MF = FAOSTAT$MF,
+              Area = FAOSTAT$Area,
               Prod = FAOSTAT$Prod,
               price=GetFAOSTAT_Price(syear=syear,fyear=fyear)))
 }
@@ -326,6 +327,11 @@ CleanFAOSTAT <- function(FAOSTAT){
       Item
     )
 
+  AREA <- FAO_F1%>%
+    filter(
+      Element == "Area harvested"
+    )
+  
   ###################### ITEM CATEGORIES
   
   ## adding the grouping of 2021 report
@@ -413,7 +419,7 @@ CleanFAOSTAT <- function(FAOSTAT){
       !is.na(Item.Code) 
     )
   
-  return(list(yield_data = YIELD, MF = MF,Prod = Production))
+  return(list(yield_data = YIELD, MF = MF,Prod = Production,Area = AREA))
 }
 
 GetModelProduction<-function(syear=1990,fyear=NULL){
@@ -508,3 +514,4 @@ GetFAOSTAT_ER<-function(syear=1990,fyear=NULL){
       Year <= fyear
     )
 }
+

@@ -1591,10 +1591,79 @@ adj_r2_table <- Economic %>%
   arrange(desc(adj_r2)) 
 
 adj_r2_table%>%
-kableExtra::kable(col.names = c("Abbreviated Hazard","Sample size","R2-Adj"))
+kableExtra::kable(col.names = c("New Hazard classification","Sample size","R2-Adj"))
 ```
 * Normalise the crop losses in the Desinventar database with the productive cropland area from FAOSTAT, then re-calculate the hazard type (using haz_Ab) adj-R-squared values, make table
+
+We are only taking into account countries with registered area in FAOSTAT.
+
+```{r norm, message=FALSE,warning=FALSE, echo=FALSE}
+
+FAOSTAT <- GetFAOSTAT_All()
+
+Area <- FAOSTAT$Area%>%
+  group_by(
+    ISO3.CODE,Year
+  )%>%
+  summarise(
+    Area = sum(Value,na.rm=TRUE)
+  )
+
+adj_r2_table <- Economic %>%
+  mutate(Year = as.character(Year))%>%
+  left_join(
+    Area,
+    by = c("ISO3" = "ISO3.CODE","Year" = "Year")
+  )%>%
+  left_join(
+    df_recat,
+    by = c("haz_Ab" = "Code")
+  )%>%
+  filter(Area > 0)%>%
+  mutate(
+    Rel_Area_loss = damages_in_crops_ha/Area
+  )%>%
+  group_by(haz_Ab) %>%
+  filter(sum(!is.na(USD_2017) & !is.na(damages_in_crops_ha)) > 1)%>% 
+  summarise(
+    n = n(),  
+    adj_r2 = ifelse(n() > 1, summary(lm(USD_2017 ~ Rel_Area_loss))$adj.r.squared, NA_real_)
+  ) %>%
+  arrange(desc(adj_r2)) 
+
+adj_r2_table%>%
+kableExtra::kable(col.names = c("Abbreviated Hazard","Sample size","R2-Adj"))
+```
+
 * Same as above but with grouped-hazard types, trying different grouping methods
+
+```{r norm2, message=FALSE,warning=FALSE, echo=FALSE}
+adj_r2_table <- Economic %>%
+  mutate(Year = as.character(Year))%>%
+  left_join(
+    Area,
+    by = c("ISO3" = "ISO3.CODE","Year" = "Year")
+  )%>%
+  filter(Area > 0)%>%
+  mutate(
+    Rel_Area_loss = damages_in_crops_ha/Area
+  )%>%
+  left_join(
+    df_recat,
+    by = c("haz_Ab" = "Code")
+  )%>%
+  group_by(New_cat) %>%
+  filter(sum(!is.na(USD_2017) & !is.na(damages_in_crops_ha)) > 1)%>% 
+  summarise(
+    n = n(),  
+    adj_r2 = ifelse(n() > 1, summary(lm(USD_2017 ~ Rel_Area_loss))$adj.r.squared, NA_real_)
+  ) %>%
+  arrange(desc(adj_r2)) 
+
+adj_r2_table%>%
+kableExtra::kable(col.names = c("New Hazard classification","Sample size","R2-Adj"))
+```
+
 * Now normalise by country area instead of cropland area (country area can be extracted from the World Bank database and then left_joined to the IsoContinentRegion file), as well as normalising each impact type by their obvious variable (e.g. deaths by country population, economic cost by GDP, both of which can be extracted from the World Bank database) and recalculate the hazard type adj-R-squared values, make table
 * (Not sure about this one) Re-weight, using three progressive levels of scale of the weighting, every record such that countries that record more disasters with crop losses are given less weight, then recalculate the adj-R-squared values
 * Try many formulations of the above but for quantiles instead of the actual impact value
