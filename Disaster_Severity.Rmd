@@ -1397,7 +1397,7 @@ Economic%>%
     
 ```
 
-* Table of adj-R-squared values of all impact types against crop losses by disaster type (using haz_Ab), include sample size
+* Table of adj-R-squared values of all impact types against cattle losses by disaster type (using haz_Ab), include sample size
 
 ```{r Rsqb, message=FALSE,warning=FALSE, echo=FALSE}
 adj_r2_table <- Economic %>%
@@ -1414,7 +1414,7 @@ kableExtra::kable(col.names = c("Abbreviated Hazard","Sample size","R2-Adj"))
 ```
 
 
-* Table of adj-R-squared values of all impact types against crop losses by UN region, include sample size
+* Table of adj-R-squared values of all impact types against cattle losses by UN region, include sample size
 ```{r Rsq2b, message=FALSE,warning=FALSE, echo=FALSE}
 adj_r2_table2 <- Economic %>%
   left_join(
@@ -1441,7 +1441,7 @@ kableExtra::kable(col.names = c("UN Region","Sample size","R2-Adj"))
 ```
 
 
-* Table of adj-R-squared values of all impact types against crop losses by UN region (IN LOGARITHM), include sample size
+* Table of adj-R-squared values of all impact types against cattle losses by UN region (IN LOGARITHM), include sample size
 ```{r Rsq2logb, message=FALSE,warning=FALSE, echo=FALSE}
 adj_r2_table2 <- Economic %>%
   left_join(
@@ -1469,6 +1469,130 @@ kableExtra::kable(col.names = c("UN Region","Sample size","R2-Adj"))
 
 
 * Re-group certain hazards based on differences and then make a table of adj-R-squared values of all impact types against crop losses by grouped disaster types, include sample size
+
+We move from 29 disaster category to 12 following a similarity criteria.
+
+```{r newhaz, message=FALSE,warning=FALSE, echo=FALSE}
+
+recat <- c(
+  "Avalanche" = "Mass movement (dry)",      
+  "Cold Wave" = "Extreme temperature",      
+  "Drought" = "Drought",
+  "Earthquake" = "Earthquake",
+  "Epidemic" = "NO CATEGORY",
+  "Erosion" = "Landslide",
+  "Extra-Tropical Cyclone" = "Storm",
+  "Extreme Temperature" = "Extreme temperature",
+  "Fire" = "Wildfire",                
+  "Flash Flood"  = "Flood",
+  "Flood" = "Flood",
+  "Heat Wave" = "Extreme temperature",
+  "High Temperature" = "Extreme temperature",
+  "Insect Infestation" = "Insect infestation",
+  "Landslide" = "Landslide",
+  "Mass Movement" = "Mass movement",
+  "Mudslide" = "Mass movement",
+  "Slide" = "Mass movement",
+  "Snowfall" = "Extreme temperature",
+  "Storm" = "Storm",
+  "Storm Surge" = "Storm",                    
+  "Tornado" = "Storm",                   
+  "Tropical Cyclone" = "Storm",
+  "Tsunami" = "Flood",
+  "Wildfire" = "Wildfire",
+  "Violent Wind" = "Storm",                    
+  "Volcanic Activity"= "Volcanic activity",
+  "Wave" = "Flood",
+  "Wave Action" = "Flood"
+)
+
+df_recat <- data.frame(
+  Code = names(haz_Ab_lab),
+  haz_Ab = unname(haz_Ab_lab),
+  New_cat = recat[haz_Ab_lab],
+  stringsAsFactors = FALSE
+)
+
+```
+
+#### Adj-Rsquare crop
+```{r RsqbC, message=FALSE,warning=FALSE, echo=FALSE}
+adj_r2_table <- Economic %>%
+  left_join(
+    df_recat,
+    by = c("haz_Ab" = "Code")
+  )%>%
+  group_by(New_cat) %>%
+  filter(sum(!is.na(USD_2017) & !is.na(damages_in_crops_ha)) > 1)%>% 
+  summarise(
+    n = n(),  
+    adj_r2 = ifelse(n() > 1, summary(lm(USD_2017 ~ damages_in_crops_ha))$adj.r.squared, NA_real_)
+  ) %>%
+  arrange(desc(adj_r2)) 
+
+adj_r2_table%>%
+kableExtra::kable(col.names = c("Abbreviated Hazard","Sample size","R2-Adj"))
+```
+
+
+#### Adj-Rsquare crop - LOGARITHM
+```{r RsqbCL, message=FALSE,warning=FALSE, echo=FALSE}
+adj_r2_table <- Economic %>%
+  left_join(
+    df_recat,
+    by = c("haz_Ab" = "Code")
+  )%>%
+  group_by(New_cat) %>%
+  filter(sum(!is.na(USD_2017) & !is.na(damages_in_crops_ha)) > 1)%>% 
+  summarise(
+    n = n(),  
+    adj_r2 = ifelse(n() > 1, summary(lm(log(USD_2017) ~ log(damages_in_crops_ha)))$adj.r.squared, NA_real_)
+  ) %>%
+  arrange(desc(adj_r2)) 
+
+adj_r2_table%>%
+kableExtra::kable(col.names = c("Abbreviated Hazard","Sample size","R2-Adj"))
+```
+
+
+#### Adj-Rsquare cattle
+```{r RsqbC2, message=FALSE,warning=FALSE, echo=FALSE}
+adj_r2_table <- Economic %>%
+  left_join(
+    df_recat,
+    by = c("haz_Ab" = "Code")
+  )%>%
+  group_by(New_cat) %>%
+  filter(sum(!is.na(USD_2017) & !is.na(lost_cattle)) > 1)%>% 
+  summarise(
+    n = n(),  
+    adj_r2 = ifelse(n() > 1, summary(lm(USD_2017 ~ lost_cattle))$adj.r.squared, NA_real_)
+  ) %>%
+  arrange(desc(adj_r2)) 
+
+adj_r2_table%>%
+kableExtra::kable(col.names = c("Abbreviated Hazard","Sample size","R2-Adj"))
+```
+
+
+#### Adj-Rsquare cattle - LOGARITHM
+```{r RsqbC2L, message=FALSE,warning=FALSE, echo=FALSE}
+adj_r2_table <- Economic %>%
+  left_join(
+    df_recat,
+    by = c("haz_Ab" = "Code")
+  )%>%
+  group_by(New_cat) %>%
+  filter(sum(!is.na(USD_2017) & !is.na(lost_cattle)) > 1)%>% 
+  summarise(
+    n = n(),  
+    adj_r2 = ifelse(n() > 1, summary(lm(log(USD_2017) ~ log(lost_cattle)))$adj.r.squared, NA_real_)
+  ) %>%
+  arrange(desc(adj_r2)) 
+
+adj_r2_table%>%
+kableExtra::kable(col.names = c("Abbreviated Hazard","Sample size","R2-Adj"))
+```
 * Normalise the crop losses in the Desinventar database with the productive cropland area from FAOSTAT, then re-calculate the hazard type (using haz_Ab) adj-R-squared values, make table
 * Same as above but with grouped-hazard types, trying different grouping methods
 * Now normalise by country area instead of cropland area (country area can be extracted from the World Bank database and then left_joined to the IsoContinentRegion file), as well as normalising each impact type by their obvious variable (e.g. deaths by country population, economic cost by GDP, both of which can be extracted from the World Bank database) and recalculate the hazard type adj-R-squared values, make table
