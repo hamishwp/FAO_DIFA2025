@@ -23,7 +23,7 @@ beta_y1 <- rnorm(n_isos, mu_AR1, sig_AR1)   # AR1 mean function trend
 beta_0 <- abs(rnorm(n_isos, mean = 1000, sd = 300))       # Initial bias correction
 # Disaster Parameters
 hsev <- (1:n_haz)^2 # rgamma(n_haz, shape = 2, scale = 1)  # Hazard severity by type
-csev <- rep(0.,n_isos)#rnorm(n_isos, mean = 0, sd = 0.5)      # Country severity
+csev <- rnorm(n_isos, mean = 0, sd = 0.25) # rep(0.,n_isos)  # Country severity
 beta_dis <- -5 # Disaster-severity regression coefficient
 beta_dur <- 1. # Hazard duration contribution to disaster severity
 
@@ -155,8 +155,8 @@ rstan_options(auto_write = TRUE)
 
 # ----- Compile Stan Model -----
 # stan_model_code <- "./RCode/Models/DIFA2025_redredDisSev.stan"  # Specify your Stan model path
-stan_model_code <- "./RCode/Models/DIFA2025.stan"  # Specify your Stan model path
-if(grepl("DIFA2025.stan",stan_model_code)) {
+stan_model_code <- "./RCode/Models/DIFA2025_csev.stan"  # Specify your Stan model path
+if(grepl("DIFA2025.stan",stan_model_code) | grepl("DIFA2025_csev.stan",stan_model_code)) {
   data_list$alpha_dis<-array(2,dim = c(n_isos,max(n_dis)))
   data_list$lambda_dis<-array(0.1,dim = c(n_isos,max(n_dis)))
 }
@@ -173,7 +173,7 @@ mcmc_results <- sampling(
   warmup = 1500, 
   seed = 42,
   control = list(adapt_delta = 0.95, max_treedepth=15),
-  sample_file="./Data/Results/Simulations/DIFA2025.csv"
+  sample_file="./Data/Results/Simulations/DIFA2025_csev.csv"
 )
 print(mcmc_results)
 

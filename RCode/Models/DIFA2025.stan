@@ -38,7 +38,7 @@ data {
 parameters {
   // Disaster parameters
   vector<lower=0>[n_haz] hsev; // Hazard severity, per hazard type
-  // vector[n_isos] csev; //  Country severity
+  vector[n_isos] csev; //  Country severity
   real beta_dis; // Disaster-severity regression coefficient
   real<lower=0> beta_dur; // Hazard duration regression coefficient
   array[n_isos] vector<lower=0>[max(n_dis)] iprox; // Disaster-specific severity
@@ -52,8 +52,8 @@ parameters {
 model {
  // Priors
  hsev ~ gamma(2,1); // Hazard severity
- // csev ~ normal(0,1); // Country severity
- vector[n_isos] csev = rep_vector(0,n_isos);
+ csev ~ normal(0,1); // Country severity
+ // vector[n_isos] csev = rep_vector(0,n_isos);
  rho ~ gamma(2,2); // GPR length-scale
  alpha ~ gamma(2,1); // GPR marginal standard-deviation
  beta_dis ~ normal(0,5); // Disaster-severity regression coefficient
