@@ -1052,7 +1052,7 @@ Economic%>%
 ```
 
 ```{r economics8b, message=FALSE,warning=FALSE, echo=FALSE}
-Economic%>%
+Economic%>%filter(haz_Ab%in%c("FL","ST","DR","TC","LS"))%>%
   left_join(
     haz_Ab_lab_df,
     by = c("haz_Ab" = "Code")
