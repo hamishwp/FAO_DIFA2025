@@ -1665,6 +1665,51 @@ kableExtra::kable(col.names = c("New Hazard classification","Sample size","R2-Ad
 ```
 
 * Now normalise by country area instead of cropland area (country area can be extracted from the World Bank database and then left_joined to the IsoContinentRegion file), as well as normalising each impact type by their obvious variable (e.g. deaths by country population, economic cost by GDP, both of which can be extracted from the World Bank database) and recalculate the hazard type adj-R-squared values, make table
+
+#### Normalization by WB area
+
+```{r, message=FALSE,warning=FALSE, echo=FALSE}
+ WB_AREA <- getWDItoSYB(
+    indicator = "AG.LND.TOTL.K2", 
+    name = "AG.LND.TOTL.K2"
+  )["entity"]%>%
+    as.data.frame()%>%
+  filter(entity.Year == 2022)%>%
+  transmute(
+    Area = entity.AG.LND.TOTL.K2/100,
+    ISO3.CODE = countrycode(
+      entity.ISO2_WB_CODE,
+      origin = "iso2c",
+      destination = "iso3c"
+    )
+  )
+
+adj_r2_table <- Economic %>%
+  mutate(Year = as.character(Year))%>%
+  left_join(
+    WB_AREA,
+    by = c("ISO3" = "ISO3.CODE")
+  )%>%
+  filter(Area > 0)%>%
+  mutate(
+    Rel_Area_loss = damages_in_crops_ha/Area
+  )%>%
+  left_join(
+    df_recat,
+    by = c("haz_Ab" = "Code")
+  )%>%
+  group_by(New_cat) %>%
+  filter(sum(!is.na(USD_2017) & !is.na(damages_in_crops_ha)) > 1)%>% 
+  summarise(
+    n = n(),  
+    adj_r2 = ifelse(n() > 1, summary(lm(USD_2017 ~ Rel_Area_loss))$adj.r.squared, NA_real_)
+  ) %>%
+  arrange(desc(adj_r2)) 
+
+adj_r2_table%>%
+kableExtra::kable(col.names = c("New Hazard classification","Sample size","R2-Adj"))
+```
+
 * (Not sure about this one) Re-weight, using three progressive levels of scale of the weighting, every record such that countries that record more disasters with crop losses are given less weight, then recalculate the adj-R-squared values
 * Try many formulations of the above but for quantiles instead of the actual impact value
 
