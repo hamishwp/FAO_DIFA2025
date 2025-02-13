@@ -180,6 +180,6 @@ print(mcmc_results)
 # Plot MCMC diagnostics
 traceplot(mcmc_results, pars = c("beta_dis", "hsev", "beta_y1"))
 
-
+mcmc_results<-rstan::read_stan_csv(list.files("./Data/Results/Simulations/RedRedDis_Success/",full.names = T))
 
 
