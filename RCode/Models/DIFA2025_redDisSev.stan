@@ -53,7 +53,7 @@ model {
  alpha ~ gamma(2,1); // GPR marginal standard-deviation
  beta_dis ~ normal(0,5); // Disaster-severity regression coefficient
  beta_dur ~ gamma(2,1); // Hazard duration coefficient
- beta_y1 ~ normal(mu_AR1, 3*sig_AR1); // GPR AR1 mean function coefficient - empirical Bayes
+ beta_y1 ~ normal(mu_AR1, sig_AR1); // GPR AR1 mean function coefficient - empirical Bayes
  // beta_0 ~ normal(0,5); // GPR time=0 regression bias correction
  // GPR mean function
  vector[n_t] mu;
@@ -94,3 +94,5 @@ model {
    y[iso,] ~ multi_normal_cholesky(mu, L_K);
  }
 }
+
+
