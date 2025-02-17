@@ -28,7 +28,7 @@ EMDATHazards_API<-function(EMDAT){
 # Clean up the EM-DAT data, such as converting from day, month, year to date
 CleanEMDAT_API<-function(EMDAT){
   # Some of the column names are messed up due to presence of non-letters
-  EMDAT%<>%rename("ISO3.CODE" = "iso",
+  EMDAT%<>%rename("ISO3" = "iso",
                   "AID.Contribution"="aid_contribution",
                   "Reconstruction.Costs"="reconstr_dam",
                   "Reconstruction.Costs.Adjusted"="reconstr_dam_adj",
@@ -95,51 +95,25 @@ CleanEMDAT_API<-function(EMDAT){
                             country,region))
   
   # Only saving disasters of interest
-  disaster_type_list = c( 
-    "Drought",
-    "Earthquake",
-    "Extreme temperature",
-    "Flood",
-    "Insect infestation",
-    "Landslide",
-    "Storm", 
-    "Wildfire",
-    "Volcanic activity", 
-    "Mass movement (dry)"
-  )
-  
-  EMDAT%<>%filter( 
-    type %in% disaster_type_list
-  )
-  
-  # # Extract the admin level of each entry
-  # EMDAT$imp_spat_res<-0
-  # # extract which entries have adm level 1
-  # adm1s<-sapply(1:nrow(EMDAT),function(i) {
-  #   ifelse(is.null(EMDAT$admin_units[[i]]),F,
-  #          grepl(x = colnames(EMDAT$admin_units[[i]]),"adm1_"))
-  #   },simplify = T)
-  # # extract which entries have adm level 2
-  # adm2s<-sapply(1:nrow(EMDAT),function(i) {
-  #   ifelse(is.null(EMDAT$admin_units[[i]]),F,
-  #          grepl(x = colnames(EMDAT$admin_units[[i]]),"adm2_"))
-  # },simplify = T)
-  # # Set the admin levels
-  # EMDAT$imp_spat_res[adm1s]<-1; EMDAT$imp_spat_res[adm2s]<-2
-  # # EMDAT, for now, uses GAUL ADM dataset
-  # EMDAT$imp_spat_ID<-lapply(1:nrow(EMDAT),function(i){
-  #   # If no admin units are included, return simplest ID
-  #   if(is.null(EMDAT$admin_units[[i]])) return(paste0("FAO-GAUL-ADM0-",EMDAT$imp_ISO3s[i]))
-  #   # Otherwise, combine to make the imp_spat_ID
-  #   return(paste0("FAO-GAUL-ADM",EMDAT$imp_spat_res[i],"-",
-  #                 EMDAT$imp_ISO3s[i],"-",
-  #                 (EMDAT$admin_units[[i]])[,grepl("_code",colnames(EMDAT$admin_units[[i]]))]))
-  # })
-  # # File location of the admin boundaries dataset
-  # EMDAT$imp_spat_fileloc<-EMDAT$imp_spat_URL<-"https://data.apps.fao.org/map/catalog/static/search?keyword=HiH_boundaries"
+  # disaster_type_list = c( 
+  #   "Drought",
+  #   "Earthquake",
+  #   "Extreme temperature",
+  #   "Flood",
+  #   "Insect infestation",
+  #   "Landslide",
+  #   "Storm", 
+  #   "Wildfire",
+  #   "Volcanic activity", 
+  #   "Mass movement (dry)"
+  # )
+  # 
+  # EMDAT%<>%filter( 
+  #   type %in% disaster_type_list
+  # )
   
   # Link to the hazard taxonomy from HIPS
-  EMDAT%<>%EMDATHazards_API()%>%return()
+  EMDAT%<>%EMDATHazards_API()
   
   #REMOVE IRRELEVANT VARIABLES
   
@@ -171,13 +145,13 @@ CleanEMDAT_API<-function(EMDAT){
     -hazlink,
     -haz_potlink,
     -classif_key,
-    -location,
-    -No.Injured,
-    -No.Homeless,
-    -No.Affected,
-    -Total.Affected,
-    -Total.Damages,
-    -Total.Deaths
+    -location
+    # -No.Injured,
+    # -No.Homeless,
+    # -No.Affected,
+    # -Total.Affected,
+    # -Total.Damages,
+    # -Total.Deaths
   )
   
 }
