@@ -20,7 +20,7 @@ getData<-function(syear=1990,fyear=NULL){
   # Get yield from FAOSTAT
   faostat<-GetFAOSTAT_All(syear=syear,fyear=fyear)
   # Get yearly population and GDP data from World Bank to use in normalisations
-  wbdat<-GetWB(syear=syear,fyear=fyear)
+  wbdat<-GetWorldBank(syear=syear,fyear=fyear)
   
   return(list(dissie=dissie,faostat=faostat))
 }
