@@ -98,13 +98,11 @@ IsoContinentRegion <- read_excel("Data/Taxonomies/IsoContinentRegion.xlsx")
 
 ## Desinventar Data
 
-The DesInventar database is a comprehensive disaster information system designed to systematically document and analyse the impacts of natural hazards at the subnational level. Developed by the United Nations Office for Disaster Risk Reduction (UNDRR) and other partners, it provides historical records of disasters across many different countries around the world. Each country, territory or country cluster present in Desinventar is responsible for curating, producing and managing disaster impact records, thus governments are the database custodians. The database is built on standardised methodologies, ensuring comparability of disaster impacts across time and regions. Its primary objective is to support disaster risk management, policy development, and research by offering granular, locally reported data on the effects of natural hazards on communities, infrastructure, and livelihoods. By systematically collecting and organising these diverse impact types, DesInventar serves as a valuable tool for disaster risk reduction planning and the implementation of frameworks such as the Sendai Framework for Disaster Risk Reduction and the Sustainable Development Goals (SDGs). It enables policymakers and researchers to identify trends, assess vulnerabilities, and design more effective strategies for resilience-building. DesInventar categorises disaster impacts into multiple dimensions, capturing both direct and indirect consequences. The data includes human impacts, such as the number of fatalities and injured persons. It also records economic losses, damage to built environment and productive sectors. It provides measures of agricultural impacts in the form of crop losses in hectares and livestock losses, which are critical for understanding food security risks. 
+The DesInventar database is a comprehensive disaster information system designed to systematically document and analyse the impacts of natural hazards at the subnational level. Developed by the United Nations Office for Disaster Risk Reduction (UNDRR) and other partners, it provides historical records of disasters across many different countries around the world. Each country, territory or country cluster present in Desinventar is responsible for curating, producing and managing disaster impact records, thus governments are the database custodians. The database is built on standardised methodologies, ensuring comparability of disaster impacts across time and regions. Its primary objective is to support disaster risk management, policy development, and research by offering granular, locally reported data on the effects of natural hazards on communities, infrastructure, and livelihoods.
+
+By systematically collecting and organising these diverse impact types, DesInventar serves as a valuable tool for disaster risk reduction planning and the implementation of frameworks such as the Sendai Framework for Disaster Risk Reduction and the Sustainable Development Goals (SDGs). It enables policymakers and researchers to identify trends, assess vulnerabilities, and design more effective strategies for resilience-building. DesInventar categorises disaster impacts into multiple dimensions, capturing both direct and indirect consequences. The data includes human impacts, such as the number of fatalities and injured persons. It also records economic losses, damage to built environment and productive sectors. It provides measures of agricultural impacts in the form of crop losses in hectares and livestock losses, which are critical for understanding food security risks. 
 
 The Desinventar impact database is the only database to contain historical estimates of crop and livestock loss and damage across the globe. Please note that only 93 countries, territories and country clusters are present in the Desinventar databases, with almost all of these countries having ceased to update their national databases with new records since roughly 2016. The Desinventar data is integrated into this work because it can be used to estimate the correlations between different impact types when another impact type is not present: to correlate crop losses with economic costs or deaths, for example. However, care must be taken in order to adjust for bias that can be present across countries, continents, hazard types, impact types and time-periods.
-
-## Ignacio Support
-
-Ignacio, please will you analyse the Desinventar data via the following plots?
 
 ### Bias Analysis
 
@@ -118,7 +116,7 @@ dessie%>%
   summarise(
     Crop_Info = sum(!is.na(damages_in_crops_ha)), 
     Animals_Info = sum(!is.na(lost_cattle))
-  )%>%
+  )%>%arrange(desc(Animals_Info))%>%arrange(desc(Crop_Info))%>%
 kableExtra::kable(
   col.names = c(
     "Country - ISO3",
@@ -132,99 +130,12 @@ kableExtra::kable(
 * Barplot of number of Desinventar records with crop and cattle losses by region
 
 ```{r barplot_reg, message=FALSE,warning=FALSE, echo=FALSE}
-dessie%>%
-  left_join(
-    IsoContinentRegion%>%
-      rename(
-        Region = 'UN Region',
-        ISO3 = 'ISO Code'
-      )%>%
-      select(
-        Region,
-        ISO3
-      ),
-    by = "ISO3"
-  )%>%
-  filter(
-    !is.na(Region)
-  )%>%
-  group_by(Region) %>%
-  summarise(
-    Crop_Info = sum(!is.na(damages_in_crops_ha)), 
-    Animals_Info = sum(!is.na(lost_cattle))
-  )%>%
-  ggplot(
-    aes(
-      x = reorder(Region,-Crop_Info),
-      y = Crop_Info
-    )
-  )+
-  geom_bar(
-    stat = "identity",
-    fill = "#5b9dcf"
-  ) +
-  labs(
-        x = "Region",
-        y = "Number of registers",
-        title = "Number of desinventar records associated to crops by region"
-      )  +
-      theme(
-        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
-        axis.text = element_text(family = "Arial", size = 10),
-        axis.title = element_text(family = "Arial", size = 11),
-        axis.line = element_line(color = "black"),
-        legend.position = "none"
-      ) 
 
 dessie%>%
   left_join(
     IsoContinentRegion%>%
       rename(
-        Region = 'UN Region',
-        ISO3 = 'ISO Code'
-      )%>%
-      select(
-        Region,
-        ISO3
-      ),
-    by = "ISO3"
-  )%>%
-  filter(
-    !is.na(Region)
-  )%>%
-  group_by(Region) %>%
-  summarise(
-    Crop_Info = sum(!is.na(damages_in_crops_ha)), 
-    Animals_Info = sum(!is.na(lost_cattle))
-  )%>%
-  ggplot(
-    aes(
-      x = reorder(Region,-Animals_Info),
-      y = Animals_Info
-    )
-  )+
-  geom_bar(
-    stat = "identity",
-    fill = "#5b9dcf"
-  ) +
-  labs(
-        x = "Region",
-        y = "Number of registers",
-        title = "Number of desinventar records associated to animals by region"
-      )  +
-      theme(
-        plot.title = element_text(family = "Arial", size = 15, face = "bold", color = "#5b9dcf"),
-        axis.text = element_text(family = "Arial", size = 10),
-        axis.title = element_text(family = "Arial", size = 11),
-        axis.line = element_line(color = "black"),
-        legend.position = "none"
-      ) 
-
-dessie%>%
-  left_join(
-    IsoContinentRegion%>%
-      rename(
-        Region = 'UN Region',
+        Region = 'UN Sub Region',
         ISO3 = 'ISO Code'
       )%>%
       select(
@@ -259,7 +170,7 @@ dessie%>%
   ) +
   labs(
         x = "Region",
-        y = "Number of registers",
+        y = "Number of Records",
         title = "Number of desinventar records associated to animals/crop by region"
       )  +
       theme(
@@ -267,7 +178,7 @@ dessie%>%
         axis.text = element_text(family = "Arial", size = 10),
         axis.title = element_text(family = "Arial", size = 11),
         axis.line = element_line(color = "black"),
-        axis.text.x  = element_text(size = 7)
+        axis.text.x  = element_text(angle = 45, size = 7, vjust = 0.3)
       ) 
 ```
 
@@ -283,16 +194,17 @@ dessie%>%
   ggplot(
     aes(
       x = reorder(haz_Ab,-Crop_Info),
-      y = Crop_Info
+      y = Crop_Info,
     )
   )+
   geom_bar(
-    stat = "identity",
-    fill = "#5b9dcf"
+    aes(fill=haz_Ab),
+    stat = "identity"
+    # fill = "#5b9dcf"
   ) +
   labs(
         x = "Hazard",
-        y = "Number of registers",
+        y = "Number of Records",
         title = "Number of desinventar records associated to crops by hazard"
       )  +
       theme(
@@ -312,16 +224,16 @@ dessie%>%
   ggplot(
     aes(
       x = reorder(haz_Ab,-Animals_Info),
-      y = Animals_Info
+      y = Animals_Info,
     )
   )+
   geom_bar(
-    stat = "identity",
-    fill = "#5b9dcf"
+    aes(fill=haz_Ab),
+    stat = "identity"
   ) +
   labs(
         x = "Hazard",
-        y = "Number of registers",
+        y = "Number of Records",
         title = "Number of desinventar records associated to animals by hazard"
       )  +
       theme(
@@ -330,41 +242,6 @@ dessie%>%
         axis.title = element_text(family = "Arial", size = 11),
         axis.line = element_line(color = "black"),
         legend.position = "none"
-      ) 
-
-dessie%>%
-  group_by(haz_Ab) %>%
-  summarise(
-    Crop_Info = sum(!is.na(damages_in_crops_ha)), 
-    Animals_Info = sum(!is.na(lost_cattle))
-  )%>%
-  pivot_longer(
-    Crop_Info:Animals_Info,
-    names_to = "Concept",
-    values_to = "Records"
-  )%>%
-  ggplot(
-    aes(
-      x = reorder(haz_Ab,-Records),
-      y = Records,
-      fill = Concept
-    )
-  )+
-  geom_bar(
-    stat = "identity",
-    position = "dodge"
-  ) +
-  labs(
-        x = "Region",
-        y = "Number of registers",
-        title = "Number of desinventar records associated to animals/crop by haz"
-      )  +
-      theme(
-        plot.title = element_text(family = "Arial", size = 12, face = "bold", color = "#5b9dcf"),
-        axis.text = element_text(family = "Arial", size = 10),
-        axis.title = element_text(family = "Arial", size = 11),
-        axis.line = element_line(color = "black"),
-        axis.text.x  = element_text(size = 7)
       ) 
 ```
 
@@ -403,7 +280,7 @@ dessie%>%
   )+
   labs(
         x = "Year",
-        y = "Number of registers",
+        y = "Number of Records",
         title = "Number of desinventar records associated to crops by year"
       )  +
       theme(
@@ -446,7 +323,7 @@ dessie%>%
   )+
   labs(
         x = "Year",
-        y = "Number of registers",
+        y = "Number of Records",
         title = "Number of desinventar records associated to animals by year"
       )  +
       theme(
@@ -478,7 +355,7 @@ dessie%>%
   pivot_longer(
     Crop_Info:Animals_Info,
     names_to = "Concept",
-    values_to = "Registers"
+    values_to = "Records"
   )%>%
   ggplot(
     aes(
@@ -495,7 +372,7 @@ dessie%>%
   )+
   labs(
         x = "Year",
-        y = "Number of registers",
+        y = "Number of Records",
         title = "Number of desinventar records associated to crops/animals by year"
       )  +
       theme(
@@ -551,7 +428,7 @@ Economic <- dessie%>%
   )
 ```
 
-From the 40072 registers recorder from 1990 onwards, 4198 have economic losses data.
+From the 40072 records from 1990 onwards, 4198 have economic losses data.
 
 * Point plot of crop losses against: deaths, economic losses, directly affected, indirectly affected, injured and missing
 

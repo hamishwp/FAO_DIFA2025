@@ -1,28 +1,23 @@
 
 # Which disaster datasets do we want?
-GetDisaster<-function(){
-  # EM-DAT is for-sure! Get rid of repeats and unknown data
-  dissie<-API_EMDAT()%>%distinct()%>%
-    arrange(ev_sdate)%>%filter(!is.na(haz_spec))
+GetDisaster<-function(syear=1990,fyear=NULL){
+  # Set final year to current year
+  if(is.null(fyear)) fyear<-AsYear(Sys.Date())
+  # EM-DAT
+  emdat<-API_EMDAT(syear=syear,fyear=fyear)%>%distinct()%>%arrange(ev_sdate)%>%filter(!is.na(haz_Ab))
+  # Desinventar
+  dessie<-GetDesinventar(forcer=F)%>%filter(!is.na(haz_Ab))%>%distinct()
+  
+  return(list(emdat=emdat,dessie=dessie))
 }
 
 # Wrangle the data but don't yet merge it
-getData<-function(syear=1990,fyear=2024){
-  # Disasters (currently EM-DAT only) 
+getData<-function(syear=1990,fyear=NULL){
+  if(is.null(fyear)) fyear<-AsYear(Sys.Date())
+  # Disasters (EM-DAT and Desinventar) 
   dissie<-GetDisaster(syear=syear,fyear=fyear)
   # Get yield from FAOSTAT
   faostat<-GetFAOSTAT_All(syear=syear,fyear=fyear)
-  # Get the USDA data
-  # usda<-GetUSDA(syear=syear,fyear=fyear)
   
-  # return(list(dissie=dissie,faostat=faostat,usda=usda))
   return(list(dissie=dissie,faostat=faostat))
-}
-
-# Merge the data
-mergeData<-function(){
-  # What format to use? Long or wide format? How to deal with commodities and different disasters?
-  
-  
-  
 }
