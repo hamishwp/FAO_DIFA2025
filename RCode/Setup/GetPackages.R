@@ -17,9 +17,10 @@ GetSourceFiles<-function(){
   # Disaster related:
   source(paste0(directory,'RCode/Data_Wrangling/GetDesinventar.R'))
   source(paste0(directory,'RCode/Data_Wrangling/GetEMDAT.R'))
-  source(paste0(directory,'RCode/Data_Wrangling/GetGIDD.R'))
   # Food and agriculture related:
   source(paste0(directory,'RCode/Data_Wrangling/GetFAOSTAT.R'))
+  # Normalisation-related data
+  source(paste0(directory,'RCode/Data_Wrangling/GetWorldBank.R'))
 }
 
 LoadLibraries<-function(){
