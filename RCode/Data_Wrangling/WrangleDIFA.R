@@ -16,6 +16,8 @@ NormaliseImpacts<-function(df,wb){
   # First make sure that any empty values are not normalised
   wb%<>%mutate_at(c("GDP","population","livestock","surfarea"),
                   function(x) {x[x<=0]<-NA; return(x)})
+  print(paste0("Number of countries with NAs = ",paste0(sapply(3:ncol(wb),function(i) {paste0(names(wb)[i],"=",length(unique(wb$ISO3[is.na(wb[,i])])))}),collapse=", ")))
+  print(paste0("Number of database countries not in wb = ",sum(!unique(df$ISO3)%in%unique(wb$ISO3))," (",paste0(unique(df$ISO3)[!unique(df$ISO3)%in%wb$ISO3],collapse = ","),")"))
   # Temporary year-wise join
   df$year<-AsYear(df$sdate)
   # Left join the World Bank data
@@ -91,8 +93,6 @@ PrepDIFA<-function(difa){
   # Normalise both the EM-DAT and Desinventar datasets
   difa$dissie$emdat%<>%NormaliseImpacts(difa$wb)
   difa$dissie$dessie%<>%NormaliseImpacts(difa$wb)
-  # Check the normalisations went ok
-  stop("Diagnostics to check impact normalisations, for both EM-DAT & Desinventar")
   # Add the region features
   difa$dissie$emdat%<>%AddRegion(difa$isoreg,region="unregion")
   difa$dissie$dessie%<>%AddRegion(difa$isoreg,region="unregion")
@@ -101,6 +101,8 @@ PrepDIFA<-function(difa){
   difa$dissie$dessie%<>%GroupHazs()
   # Get rid of the elements we don't need anymore
   difa$wb<-difa$isoreg<-NULL
+  difa$dissie$emdat%<>%filter(year>1989 & !is.na(haz_grp) & !is.na(ISO3))
+  difa$dissie$dessie%<>%filter(year>1989 & !is.na(haz_grp) & !is.na(ISO3))
   
   return(difa)
 }
@@ -124,3 +126,6 @@ getData<-function(syear=1990,fyear=NULL){
   list(dissie=dissie,faostat=faostat,wb=wb,isoreg=isoreg)%>%
     PrepDIFA()
 }
+
+
+

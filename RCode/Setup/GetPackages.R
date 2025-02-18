@@ -65,7 +65,8 @@ GetPackages<-function(packred=T){
   list.of.packages <- c("devtools","dplyr", "ggplot2","tidyverse","magrittr","stringr",
                         "RColorBrewer", "reshape2","countrycode", 'doParallel', 'abind',
                         'openxlsx',"plotly","openxlsx","pracma","ghql","jsonlite","kableExtra",
-                        "rworldmap","rworldxtra","data.table","FAOSTAT","readxl")
+                        "rworldmap","rworldxtra","data.table","FAOSTAT","readxl",
+                        "combinat","lme4")
   
   new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
   if(length(new.packages)>0) install.packages(new.packages, repos='http://cran.us.r-project.org')
