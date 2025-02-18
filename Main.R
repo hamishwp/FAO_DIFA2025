@@ -21,15 +21,15 @@ stan_model_code <- "./RCode/Models/DIFA2025.stan"
 # Main function
 execDIFA<-function(){
   # Extract, transform then merge data (functions found in 'RCode/Data_Wrangling/')
-  difaDF<-getData(syear=syear,fyear=fyear)
+  difa<-getData(syear=syear,fyear=fyear)
   # Train the model
-  mGPR<-TrainModel(df=difaDF,model=stan_model_code)
+  mGPR<-TrainModel(df=difa,model=stan_model_code)
   # Generate counterfactuals (depending on trained model)
-  cntfcts<-counterfacts(df=difaDF,model=mGPR)
+  cntfcts<-counterfacts(df=difa,model=mGPR)
   # Add economic losses
   cntfcts%<>%addEconomics()
   
-  return(list(difaDF=difaDF,
+  return(list(difa=difa,
               mGPR=mGPR,
               cntfcts=cntfcts))
 }

@@ -19,8 +19,12 @@ GetSourceFiles<-function(){
   source(paste0(directory,'RCode/Data_Wrangling/GetEMDAT.R'))
   # Food and agriculture related:
   source(paste0(directory,'RCode/Data_Wrangling/GetFAOSTAT.R'))
-  # Normalisation-related data
+  # Other key datasets required:
   source(paste0(directory,'RCode/Data_Wrangling/GetWorldBank.R'))
+  # Data processing functions
+  source(paste0(directory,'RCode/Data_Wrangling/WrangleDIFA.R'))
+  source(paste0(directory,'RCode/Data_Wrangling/GetISORegions.R'))
+  
 }
 
 LoadLibraries<-function(){
