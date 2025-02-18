@@ -6,4 +6,8 @@
 Plots
 *.Rproj
 *Data/RawData
-Disaster_Severity.html
+*Disaster_Severity.html
+*Disaster Severity*
+*.csv
+./Data/Results/*
+*.rds
