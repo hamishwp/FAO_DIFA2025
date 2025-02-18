@@ -82,11 +82,11 @@ CleanEMDAT_API<-function(EMDAT){
                               "01"),collapse = "-"))-1,"%d")
     },simplify = T)
   # Start date in one
-  EMDAT$ev_sdate<-EMDAT$imp_unitdate<-sapply(1:nrow(EMDAT),function(i) paste0(c(EMDAT$start_year[i],
+  EMDAT$sdate<-EMDAT$imp_unitdate<-sapply(1:nrow(EMDAT),function(i) paste0(c(EMDAT$start_year[i],
                                                                                 EMDAT$start_month[i],
                                                                                 EMDAT$start_day[i]),collapse = "-"),simplify = T)
   # End date in one
-  EMDAT$ev_fdate<-sapply(1:nrow(EMDAT),function(i) paste0(c(EMDAT$end_year[i],
+  EMDAT$fdate<-sapply(1:nrow(EMDAT),function(i) paste0(c(EMDAT$end_year[i],
                                                             EMDAT$end_month[i],
                                                             EMDAT$end_day[i]),collapse = "-"),simplify = T)
   # Remove everything we dont need

@@ -144,8 +144,11 @@ ExtImpDev<-function(xmlly){
     'hospitals','damages_in_crops_ha','lost_cattle','damages_in_roads_mts')) {
     if(im%in%colnames(impacts)) impacts[is.na(impacts[,im]) | impacts[,im]<=1e-5,im]<-NA
   }
-  
-  return(impacts)
+  # Get rid of the flag variables now that we have used them
+  # impacts%>%dplyr::select(grep("flag_",colnames(impacts),value=T,invert=T))%>%return()
+  impacts%>%dplyr::select(c("deaths","injured","missing","directly_affected",
+                            "losses_in_dollar","damages_in_crops_ha","lost_cattle",
+                            "duration","ISO3","sdate","fdate","haz_Ab"))%>%return()
 }
 
 ReadDessie<-function(iso3, forcer=F){
