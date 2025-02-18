@@ -148,7 +148,7 @@ CleanEMDAT_API<-function(EMDAT){
     -hazlink,
     -haz_potlink,
     -classif_key,
-    -location
+    -location,
     -No.Injured,
     -No.Homeless,
     -No.Affected,
@@ -157,7 +157,7 @@ CleanEMDAT_API<-function(EMDAT){
     # -Total.Deaths
   )
   
-  colnames(EMDAT)<-c("ISO3","deaths","affected","cost","sdate","fdate","haz_Ab")
+  colnames(EMDAT)<-c("ISO3","deaths","affected","cost","sdate","fdate","Total_damages","haz_Ab")
   
   return(EMDAT)
   
