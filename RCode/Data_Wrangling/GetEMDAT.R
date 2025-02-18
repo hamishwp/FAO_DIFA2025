@@ -89,6 +89,8 @@ CleanEMDAT_API<-function(EMDAT){
   EMDAT$fdate<-sapply(1:nrow(EMDAT),function(i) paste0(c(EMDAT$end_year[i],
                                                             EMDAT$end_month[i],
                                                             EMDAT$end_day[i]),collapse = "-"),simplify = T)
+  
+  EMDAT$duration<-as.numeric(as.Date(EMDAT$fdate)-as.Date(EMDAT$sdate))
   # Remove everything we dont need
   EMDAT%<>%dplyr::select(-c(start_day,start_month,start_year,
                             end_day,end_month,end_year,
@@ -118,6 +120,7 @@ CleanEMDAT_API<-function(EMDAT){
   #REMOVE IRRELEVANT VARIABLES
   
   EMDAT%<>%select( 
+    -disno,
     -external_ids,
     -name,
     -origin,
@@ -146,13 +149,17 @@ CleanEMDAT_API<-function(EMDAT){
     -haz_potlink,
     -classif_key,
     -location
-    # -No.Injured,
-    # -No.Homeless,
-    # -No.Affected,
+    -No.Injured,
+    -No.Homeless,
+    -No.Affected,
     # -Total.Affected,
-    # -Total.Damages,
+    -Total.Damages,
     # -Total.Deaths
   )
+  
+  colnames(EMDAT)<-c("ISO3","deaths","affected","cost","sdate","fdate","haz_Ab")
+  
+  return(EMDAT)
   
 }
 
