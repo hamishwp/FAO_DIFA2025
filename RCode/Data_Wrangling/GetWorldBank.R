@@ -12,12 +12,12 @@ GetWorldBank<-function(syear=1990,fyear=NULL){
                             start_date = as.character(syear),
                             end_date = as.character(fyear))
     # Get rid of unused features
-    value%<>%transmute(iso3=iso3c,date=date,value=get(i), indicator=i)
+    value%<>%transmute(ISO3=iso3c,year=date,value=get(i), indicator=i)
     # Housecleaning!
     attr(value$value,"label")<-NULL
     
     return(value)
-  }))%>%mutate(year=AsYear(year))
+  }))
   # Fill in any NAs with their nearest values
   wb%<>%arrange(indicator, ISO3, year)%>%  
     group_by(indicator, ISO3)%>%

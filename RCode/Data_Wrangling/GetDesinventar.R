@@ -386,7 +386,17 @@ GetEachDesinventar<-function(ISO3,forcer=F){
 }
 
 GetDesinventar<-function(forcer=T, ISO3s=NULL){
-  if(!forcer & file.exists("./Data/RawData/Desinventar.RData")) return(readRDS("./Data/RawData/Desinventar.RData"))
+  if(!forcer & file.exists("./Data/RawData/Desinventar.RData")) {
+    impacts<-readRDS("./Data/RawData/Desinventar.RData")
+    if("directly_affected"%in%colnames(impacts)){
+      impacts%<>%dplyr::select(c("deaths","directly_affected",
+                                 "losses_in_dollar","damages_in_crops_ha","lost_cattle",
+                                 "duration","ISO3","sdate","fdate","haz_Ab"))
+      # Clean up names
+      colnames(impacts)<-c("deaths","affected","cost","crops","cattle","duration","ISO3","sdate","fdate","haz_Ab")
+    }
+    return(impacts)
+  }
   # Only certain countries have Desinventar databases
   if(is.null(ISO3s)) ISO3s<-GetDessieISOs()$isos
   # Download the most recent data from Desinventar
