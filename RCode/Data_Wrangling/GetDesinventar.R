@@ -402,7 +402,7 @@ GetDesinventar<-function(forcer=T, ISO3s=NULL){
     Dessie<-tryCatch(GetEachDesinventar(iso),error=function(e) NULL)
     if(is.null(Dessie)) return(list())
     # Get rid of repeated entries
-    Dessie%<>%distinct()%>%arrange(ev_sdate)%>%
+    Dessie%<>%distinct()%>%arrange(sdate)%>%
       filter(!is.na(haz_spec) & !is.na(imp_value) & imp_value>0)
   }))))
   # Write it out just for keep-sake

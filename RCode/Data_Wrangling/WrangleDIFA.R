@@ -4,7 +4,7 @@ GetDisaster<-function(syear=1990,fyear=NULL){
   # Set final year to current year
   if(is.null(fyear)) fyear<-AsYear(Sys.Date())
   # EM-DAT
-  emdat<-API_EMDAT(syear=syear,fyear=fyear)%>%distinct()%>%arrange(ev_sdate)%>%filter(!is.na(haz_Ab))
+  emdat<-API_EMDAT(syear=syear,fyear=fyear)%>%distinct()%>%arrange(sdate)%>%filter(!is.na(haz_Ab))
   # Desinventar
   dessie<-GetDesinventar(forcer=F)%>%filter(!is.na(haz_Ab))%>%distinct()
   

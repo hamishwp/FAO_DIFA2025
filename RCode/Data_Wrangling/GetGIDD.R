@@ -43,7 +43,7 @@ GetGIDD<-function(){
   # Hazard taxonomy - HIPS
   GIDD%<>%GIDDHazards()
   # Modify date names
-  GIDD$imp_sdate<-GIDD$imp_fdate<-GIDD$ev_sdate<-GIDD$ev_fdate<-GIDD$imp_unitdate<-as.character(GIDD$DateofEvent)
+  GIDD$imp_sdate<-GIDD$imp_fdate<-GIDD$sdate<-GIDD$fdate<-GIDD$imp_unitdate<-as.character(GIDD$DateofEvent)
   # Rename the event name
   colnames(GIDD)[colnames(GIDD)=="EventName"]<-"ev_name"
   GIDD$ev_name_lang<-"lang_eng"
@@ -115,8 +115,8 @@ GetGIDD_API<-function(){
     },simplify = T)))
   })
   # Add some of the extra details that are GIDD-specific
-  GIDD%<>%mutate(ev_sdate=imp_sdate,
-                 ev_fdate=imp_fdate,
+  GIDD%<>%mutate(sdate=imp_sdate,
+                 fdate=imp_fdate,
                  ev_ISO3s=imp_ISO3s,
                  imp_credate=paste0((AsYear(imp_sdate)+1),"-04-30"),
                  imp_moddate=imp_credate,
@@ -176,8 +176,8 @@ GetIDU_API<-function(){
     "imp_ISO3s"="iso3",
     "imp_sdate"="displacement_start_date",
     "imp_fdate"="displacement_end_date",
-    "ev_sdate"="event_start_date",
-    "ev_fdate"="event_end_date",
+    "sdate"="event_start_date",
+    "fdate"="event_end_date",
     "ev_name"="event_name",
     "HazardCategory"="category",
     "HazardType"="type",
@@ -221,7 +221,7 @@ convGIDD_Monty<-function(taby=F){
   # Get the GIDD data
   GIDD<-GetGIDD_API()
   # Arrange in event date order
-  GIDD%<>%arrange(ev_sdate)
+  GIDD%<>%arrange(sdate)
   
   if(taby) return(GIDD)
   
@@ -245,7 +245,7 @@ convGIDD_Monty<-function(taby=F){
   )
   # temporal
   temporal<-Add_EvTemp_Monty(
-    GIDD%>%dplyr::select(event_ID,ev_sdate,ev_fdate)
+    GIDD%>%dplyr::select(event_ID,sdate,fdate)
   )
   # Hazards
   allhaz_class<-Add_EvHazTax_Monty(
@@ -331,7 +331,7 @@ convIDU_Monty<-function(taby=F){
   # Get the IDU data
   IDU<-GetIDU_API()
   # Arrange in event date order
-  IDU%<>%arrange(ev_sdate)
+  IDU%<>%arrange(sdate)
   
   if(taby) return(IDU)
   
@@ -350,7 +350,7 @@ convIDU_Monty<-function(taby=F){
   )
   # temporal
   temporal<-Add_EvTemp_Monty(
-    IDU%>%dplyr::select(event_ID,ev_sdate,ev_fdate)
+    IDU%>%dplyr::select(event_ID,sdate,fdate)
   )
   # Hazards
   allhaz_class<-Add_EvHazTax_Monty(
