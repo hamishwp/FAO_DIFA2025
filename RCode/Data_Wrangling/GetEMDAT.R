@@ -298,3 +298,113 @@ API_EMDAT<-function(syear=1991,fyear=NULL){
 #   return(EMDAT)
 #   
 # }
+
+GET_EMDAT_MODEL <- function(){
+  # FORMAT EM-DAT
+  
+  disaster_data <- API_EMDAT()
+  
+  disaster_data$sdate <- as.Date(disaster_data$sdate)
+  disaster_data$fdate <- as.Date(disaster_data$fdate)
+  
+  disaster_data <- disaster_data %>%
+    mutate(
+      sdate = as.Date(sdate),
+      fdate = as.Date(fdate),
+      sy = year(sdate),                     
+      ey = year(fdate),                   
+      s_frac = (yday(sdate) - 1) / 365,        
+      e_frac = yday(fdate) / 365,             
+      duration_years = as.numeric(fdate - sdate) / 365,  
+      endt = sy + s_frac + duration_years     
+    )
+  
+  years_all <- seq(min(disaster_data$sy), max(disaster_data$ey))
+  
+  isos <- unique(disaster_data$ISO3)
+  
+  max_events <- disaster_data%>% 
+    group_by(ISO3)%>% 
+    summarise(n = n())%>%
+    pull(n)%>%
+    max()
+  
+  ts <- array(
+    NA, 
+    dim = c(length(isos), length(years_all), max_events),
+    dimnames = list(isos, as.character(years_all), NULL)
+  )
+  
+  tf <- array(
+    NA, 
+    dim = c(length(isos), length(years_all), max_events),
+    dimnames = list(isos, as.character(years_all), NULL)
+  )
+  
+  hazdur <- array(
+    NA, 
+    dim = c(length(isos), length(years_all), max_events),
+    dimnames = list(isos, as.character(years_all), NULL)
+  )
+  
+  flag <- array(
+    0, 
+    dim = c(length(isos), length(years_all), max_events),
+    dimnames = list(isos, as.character(years_all), NULL)
+  )
+  
+  disaster_data%<>% 
+    arrange(ISO3, sdate)%>% 
+    group_by(ISO3)%>% 
+    mutate(
+      event_id = row_number()
+    )
+  
+  for(i in 1:nrow(disaster_data)){
+    iso <- disaster_data$ISO3[i]
+    event <- disaster_data$event_id[i]
+    sy <- disaster_data$sy[i]      
+    ey <- disaster_data$ey[i]      
+    sfrac <- disaster_data$s_frac[i]
+    efrac <- disaster_data$e_frac[i]
+    duration_years <- disaster_data$duration_years[i]
+    endt <- disaster_data$endt[i]
+    
+    for(t in as.numeric(sy):as.numeric(max(years_all))){
+      t_chr <- as.character(t)
+      flag[iso, t_chr, event] <- 1
+    }
+    
+    for(t in as.numeric(sy):as.numeric(max(years_all))){
+      t_chr <- as.character(t)
+      
+      if(t == sy){ 
+        if((1 - sfrac) >= duration_years){
+          ts[iso, t_chr, event] <- 0
+          tf[iso, t_chr, event] <- 1 - sfrac - duration_years
+        } else { 
+          ts[iso, t_chr, event] <- 1
+          tf[iso, t_chr, event] <- 1
+        }
+        
+        hazdur[iso, t_chr, event] <- duration_years
+        
+      } else if(t < endt){      
+        ts[iso, t_chr, event] <- 1
+        tf[iso, t_chr, event] <- 1
+        
+      } else if(t > endt & t < (endt + 1)){
+        ts[iso, t_chr, event] <- 0
+        tf[iso, t_chr, event] <- t - endt
+      } else {
+        ts[iso, t_chr, event] <- t - 1 - endt
+        tf[iso, t_chr, event] <- t - endt
+      }
+    }
+  }
+  
+  return(list(ts = ts,
+              tf =  tf,
+              hazdur = hazdur)
+  )
+}
