@@ -67,7 +67,7 @@ hazgrp<-c(
   "DZ"="ET"
 )
 # Group the hazards together, based on the data and 'expert' judgment
-GroupHazs<-function(df){
+GroupHazs<-function(df,hazgrp=hazgrp){
   # First make sure we drop all events that we don't include in the analysis
   df%<>%filter(haz_Ab%in%names(hazgrp))
   # Create the grouping variable
