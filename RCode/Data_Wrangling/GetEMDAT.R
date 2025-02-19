@@ -157,7 +157,7 @@ CleanEMDAT_API<-function(EMDAT){
     # -Total.Deaths
   )
   
-  colnames(EMDAT)<-c("ISO3","deaths","affected","cost","sdate","fdate","Total_damages","haz_Ab")
+  colnames(EMDAT)<-c("ISO3","deaths","affected","cost","sdate","fdate","duration","haz_Ab")
   
   return(EMDAT)
   
