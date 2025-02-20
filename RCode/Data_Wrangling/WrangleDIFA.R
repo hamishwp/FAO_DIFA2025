@@ -97,8 +97,8 @@ PrepDIFA<-function(difa){
   difa$dissie$emdat%<>%AddRegion(difa$isoreg,region="unregion")
   difa$dissie$dessie%<>%AddRegion(difa$isoreg,region="unregion")
   # Group the hazards
-  difa$dissie$emdat%<>%GroupHazs()
-  difa$dissie$dessie%<>%GroupHazs()
+  difa$dissie$emdat%<>%GroupHazs(hazgrp)
+  difa$dissie$dessie%<>%GroupHazs(hazgrp)
   # Get rid of the elements we don't need anymore
   difa$wb<-difa$isoreg<-NULL
   difa$dissie$emdat%<>%filter(year>1989 & !is.na(haz_grp) & !is.na(ISO3))

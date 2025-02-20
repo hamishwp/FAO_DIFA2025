@@ -31,7 +31,7 @@ if(Desinventar){ # infer disaster severity from Desinventar data
     # Define fixed and random effect variables
     fixed_effects_all <- c("region","haz_grp")
     # Random effect for income group
-    random_effects_all <- c("(1 | duration)","(1 | incomegrp)")
+    random_effects_all <- c("duration","incomegrp")
     # Make income ordinal
     dissie%<>%mutate(incomegrp=case_when(is.na(incomegrp)~"0", 
                                          incomegrp=="Low Income"~"0",
@@ -45,10 +45,28 @@ if(Desinventar){ # infer disaster severity from Desinventar data
     fixed_combinations <- generate_subsets(fixed_effects_all) # Fixed effects subsets
     random_combinations <- generate_subsets(random_effects_all) # Random effects subsets
     # Define dependent variables
-    dep_vars <- c("crops", "cattle", "cbind(crops,cattle)")
+    dep_vars <- c("crops", "cattle") #, "cbind(crops,cattle)")
+    # Weighting function
+    calculate_weights <- function(df, factor = 0) {
+      # Compute frequencies for haz_grp, region, and incomegrp
+      haz_grp_freq <- df %>% group_by(haz_grp) %>% reframe(freq = n()) %>% mutate(weight_haz = 1 / freq)
+      region_freq <- df %>% group_by(region) %>% reframe(freq = n()) %>% mutate(weight_region = 1 / freq)
+      incomegrp_freq <- df %>% group_by(incomegrp) %>% reframe(freq = n()) %>% mutate(weight_income = 1 / freq)
+      # Merge weights back into the dataset
+      df %<>%
+        left_join(haz_grp_freq, by = "haz_grp") %>%
+        left_join(region_freq, by = "region") %>%
+        left_join(incomegrp_freq, by = "incomegrp")
+      # Compute final weight: geometric mean of three individual weights
+      df %>%
+        mutate(base_weight = sqrt(weight_haz * weight_income), 
+               weight = factor + (1 - factor) * base_weight) %>%
+        mutate(weight=weight/max(weight))%>%
+        select(-starts_with("freq"), -starts_with("weight_haz"), -starts_with("weight_region"), -starts_with("weight_income"))
+    }
     # How do we want to try to group the hazards?
-    hazgrp<-list(c(
-      "CW"="ET",
+    hazgrps<-list(
+      c("CW"="ET",
       "DR"="DR",
       "WF"="WF",
       "FL"="FL",
@@ -111,6 +129,46 @@ if(Desinventar){ # infer disaster severity from Desinventar data
     c("CW"="OT",
       "DR"="OT",
       "WF"="WF",
+      "FL"="FL",
+      "ST"="OT",
+      "TC"="OT",
+      "EQ"="OT",
+      "VO"="OT",
+      "AV"="OT",
+      "LS"="OT",
+      "HW"="OT",
+      "TS"="OT",
+      "ET"="OT",
+      "EP"="FL",
+      "VW"="OT",
+      "SN"="OT",
+      "SS"="OT",
+      "MS"="OT",
+      "TC:FL"="OT",
+      "DZ"="OT"),
+    c("CW"="OT",
+      "DR"="OT",
+      "WF"="WF",
+      "FL"="FL",
+      "ST"="ST",
+      "TC"="ST",
+      "EQ"="OT",
+      "VO"="OT",
+      "AV"="OT",
+      "LS"="OT",
+      "HW"="OT",
+      "TS"="OT",
+      "ET"="OT",
+      "EP"="FL",
+      "VW"="ST",
+      "SN"="OT",
+      "SS"="OT",
+      "MS"="OT",
+      "TC:FL"="ST",
+      "DZ"="OT"),
+    c("CW"="OT",
+      "DR"="OT",
+      "WF"="WF",
       "FL"="OT",
       "ST"="OT",
       "TC"="OT",
@@ -128,47 +186,56 @@ if(Desinventar){ # infer disaster severity from Desinventar data
       "MS"="OT",
       "TC:FL"="OT",
       "DZ"="OT"))
-    
+    # Function to create a random effect
+    Randeff<-function(x) paste0("(1 | ",x,")",collapse = " + ")
+    # Define weighting factors to iterate over
+    weighting_factors <- c(0,0.5,1)
+    # Dataframe template
     mod_res <- list()
-    for(j in 1:length(hazgrp)){
-      # Try changing the number of hazard groups
-      dissie%<>%GroupHazs(hazgrp[[j]])
-      # For each dependent variable to be modelled
-      for(deppie in dep_vars){
-        print(deppie)
-        # Function to create model formula
-        F_model <- function(impact_vars, fixed_vars, random_vars, deppie="crops") {
-          fixed_formula <- paste(c(fixed_vars, impact_vars), collapse = " + ")
-          random_formula <- paste(random_vars, collapse = " + ")
-          formula_str <- paste0(deppie," ~ ", fixed_formula, " + ", random_formula)
-          return(as.formula(formula_str))
-        }
-        # Fit models and store results
-        for (impact_vars in impact_combinations) {
-          for (fixed_vars in fixed_combinations) {
-            for (random_vars in random_combinations) {
-              # Ensure only complete records are modelled
-              df <- dissie %>% filter(complete.cases(select(., all_of(c(impact_vars, fixed_vars, 
-                                                                        str_replace_all(str_replace_all(random_vars,"\\(1 \\| ",""),"\\)",""))))))
-              # Ensure enough data for modeling
-              if (nrow(df) > 30) {  
-                # Model formula
-                formula <- F_model(impact_vars, fixed_vars, random_vars, deppie)
-                # Run the model
-                model <- try(lme4::lmer(formula = formula, data = df, REML = FALSE, verbose=F), silent = TRUE)
-                # Store results if successful
-                if (!inherits(model, "try-error")) {
-                  mod_res[[paste0(as.character(formula)[-1],collapse = " ~ ")]] <- list(
-                    model = model,
-                    dep_var=deppie,
-                    hazgrp=j,
-                    formula = paste0(formula, collapse = " "),
-                    BIC = BIC(model),
-                    AIC = AIC(model),
-                    n = nrow(df)
-                  )
-                } else {
-                  print(paste0("Failed model: ", deppie," = ", paste(impact_vars, collapse = ", "), " | ", paste(fixed_vars, collapse = ", "), " | ", paste(random_vars, collapse = ", ")))
+    # Run it!
+    for(ww in weighting_factors){
+      # Different hazard grouping models
+      for(j in 1:length(hazgrps)){
+        # Try changing the number of hazard groups
+        dissie%<>%GroupHazs(hazgrps[[j]])
+        # For each dependent variable to be modelled
+        for(deppie in dep_vars){
+          print(deppie)
+          # Function to create model formula
+          F_model <- function(impact_vars, fixed_vars, random_vars, deppie="crops") {
+            fixed_formula <- paste(fixed_vars, collapse = " + ")
+            random_formula <- paste(Randeff(c(impact_vars,random_vars)), collapse = " + ")
+            formula_str <- paste0(deppie," ~ ", fixed_formula, " + ", random_formula)
+            return(as.formula(formula_str))
+          }
+          # Fit models and store results
+          for (impact_vars in impact_combinations) {
+            for (fixed_vars in fixed_combinations) {
+              for (random_vars in random_combinations) {
+                # Ensure only complete records are modelled
+                df <- dissie %>% filter(complete.cases(select(., all_of(c(impact_vars, fixed_vars, random_vars)))))%>%
+                  calculate_weights(factor = ww)
+                # Ensure enough data for modeling
+                if (nrow(df) > 30) {  
+                  # Model formula
+                  formula <- F_model(impact_vars, fixed_vars, random_vars, deppie)
+                  # Run the model
+                  model <- try(lme4::lmer(formula = formula, data = df, REML = T, verbose=F, weights = df$weight),silent=T)
+                  # Store results if successful
+                  if (!inherits(model, "try-error")) {
+                    mod_res[[paste0(as.character(formula)[-1],collapse = " ~ ")]] <- list(
+                      # model = model,
+                      dep_var=deppie,
+                      weight_fac=ww,
+                      hazgrp=j,
+                      formula = paste0(formula, collapse = " "),
+                      BIC = BIC(model),
+                      AIC = AIC(model),
+                      n = nrow(df)
+                    )
+                  } else {
+                    print(paste0("Failed model: ", paste(impact_vars, collapse = ", "), " | ", paste(fixed_vars, collapse = ", "), " | ", paste(random_vars, collapse = ", ")))
+                  }
                 }
               }
             }
@@ -180,8 +247,9 @@ if(Desinventar){ # infer disaster severity from Desinventar data
     bench <- data.frame(
       impact_set = names(mod_res),
       dep_var = sapply(mod_res, function(x) x$dep_var),
-      formula = sapply(mod_res, function(x) x$formula),
+      # formula = sapply(mod_res, function(x) x$formula),
       hazgrp = sapply(mod_res, function(x) x$hazgrp),
+      weight_fac=sapply(mod_res, function(x) x$weight_fac),
       BIC = sapply(mod_res, function(x) x$BIC),
       AIC = sapply(mod_res, function(x) x$AIC),
       n = sapply(mod_res, function(x) x$n)
