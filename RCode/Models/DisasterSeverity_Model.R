@@ -24,7 +24,7 @@ if(Desinventar){ # infer disaster severity from Desinventar data
     # Modify certain variables
     dissie%<>%mutate_at(c("duration","deaths","cost","affected","crops","cattle"), function(x) log(x+10))
     # Set number of folds
-    num_folds <- 10
+    num_folds <- 5
     # Define independent variables
     imp_sets <- list(
       c("deaths", "cost", "affected"),
@@ -46,7 +46,7 @@ if(Desinventar){ # infer disaster severity from Desinventar data
     fixed_combinations <- generate_subsets(fixed_effects_all) # Fixed effects subsets
     random_combinations <- generate_subsets(random_effects_all) # Random effects subsets
     # Define dependent variables
-    dep_vars <- c("crops", "cattle", "norm_crops", "norm_cattle") #, "cbind(crops,cattle)")
+    dep_vars <- c("crops", "cattle") #, "norm_crops", "norm_cattle") #, "cbind(crops,cattle)")
     # Weighting function
     calculate_weights <- function(df, factor = 0) {
       # Compute frequencies for haz_grp, region, and incomegrp
@@ -128,7 +128,7 @@ if(Desinventar){ # infer disaster severity from Desinventar data
       "TC:FL"="OT",
       "DZ"="OT"),
     c("CW"="OT",
-      "DR"="OT",
+      "DR"="DR",
       "WF"="WF",
       "FL"="FL",
       "ST"="OT",
@@ -148,7 +148,7 @@ if(Desinventar){ # infer disaster severity from Desinventar data
       "TC:FL"="OT",
       "DZ"="OT"),
     c("CW"="OT",
-      "DR"="OT",
+      "DR"="DR",
       "WF"="WF",
       "FL"="FL",
       "ST"="ST",
@@ -166,29 +166,9 @@ if(Desinventar){ # infer disaster severity from Desinventar data
       "SS"="OT",
       "MS"="OT",
       "TC:FL"="ST",
-      "DZ"="OT"),
-    c("CW"="OT",
-      "DR"="OT",
-      "WF"="WF",
-      "FL"="OT",
-      "ST"="OT",
-      "TC"="OT",
-      "EQ"="OT",
-      "VO"="OT",
-      "AV"="OT",
-      "LS"="OT",
-      "HW"="OT",
-      "TS"="OT",
-      "ET"="OT",
-      "EP"="OT",
-      "VW"="OT",
-      "SN"="OT",
-      "SS"="OT",
-      "MS"="OT",
-      "TC:FL"="OT",
       "DZ"="OT"))
     # Define weighting factors to iterate over
-    weighting_factors <- c(0,0.5,1)
+    weighting_factors <- c(0.)
     # Dataframe template
     mod_res <- data.frame()
     # Run it!
