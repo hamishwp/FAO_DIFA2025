@@ -187,8 +187,6 @@ if(Desinventar){ # infer disaster severity from Desinventar data
       "MS"="OT",
       "TC:FL"="OT",
       "DZ"="OT"))
-    # Function to create a random effect
-    Randeff<-function(x) paste0("(1 | ",x,")",collapse = " + ")
     # Define weighting factors to iterate over
     weighting_factors <- c(0,0.5,1)
     # Dataframe template
@@ -204,9 +202,9 @@ if(Desinventar){ # infer disaster severity from Desinventar data
           print(deppie)
           # Function to create model formula
           F_model <- function(impact_vars, fixed_vars, random_vars, deppie="crops") {
-            fixed_formula <- paste(fixed_vars, collapse = " + ")
-            random_formula <- paste(Randeff(c(impact_vars,random_vars)), collapse = " + ")
-            formula_str <- paste0(deppie," ~ ", fixed_formula, " + ", random_formula)
+            random_formula <- paste(c("1",impact_vars,random_vars), collapse = " + ")
+            fixed_formula <- paste0(paste0("(", random_formula," | "),fixed_vars,")",collapse = " + ")
+            formula_str <- paste0(deppie," ~ ", fixed_formula)
             return(as.formula(formula_str))
           }
           # Fit models and store results
@@ -221,7 +219,7 @@ if(Desinventar){ # infer disaster severity from Desinventar data
                   # Ensure reproducibility
                   set.seed(123)
                   # Create 10 CV folds
-                  df$fold <- createFolds(df$weight, k = num_folds, list = FALSE)
+                  df$fold <- caret::createFolds(df$weight, k = num_folds, list = FALSE)
                   # Model formula
                   formula <- F_model(impact_vars, fixed_vars, random_vars, deppie)
                   # Store BIC for each fold
@@ -252,7 +250,7 @@ if(Desinventar){ # infer disaster severity from Desinventar data
                     weight_fac = ww,
                     hazgrp = j,
                     formula = paste0(as.character(formula)[2:3], collapse = " ~ "),
-                    BIC = mean(bic_values),
+                    BIC = median(bic_values),
                     sBIC = sd(bic_values),
                     n = nrow(df)
                   ))
@@ -263,12 +261,101 @@ if(Desinventar){ # infer disaster severity from Desinventar data
         }
       }
     }
+    # BIC value per observation
+    mod_res%<>%mutate(nBIC=BIC/n)
     # Display the model comparison results
     View(mod_res)
+    # Find the ideal hazard grouping
+    tby_hzgp<-mod_res%>%filter(weight_fac==0)%>%arrange(BIC)%>%group_by(dep_var,n)%>%slice(1)%>%ungroup()%>%pull(hazgrp)%>%table()
+    hazgrp_f<-as.integer(names(tby_hzgp)[which.max(tby_hzgp)]); hazgrp_f<-2
+    # Prepare the Desinventar and EM-DAT datasets
+    dissie %<>% GroupHazs(hazgrps[[hazgrp_f]]) %>% calculate_weights(factor = 0)
+    emdat %<>% GroupHazs(hazgrps[[hazgrp_f]])
+    # Modify certain variables
+    emdat%<>%mutate_at(c("duration","deaths","cost","affected"), 
+                       function(x) log(x+10))%>%
+      mutate(incomegrp=case_when(is.na(incomegrp)~"0", 
+                                         incomegrp=="Low Income"~"0",
+                                         incomegrp=="Middle Income"~"1",
+                                         incomegrp=="High Income"~"2", TRUE ~ "0"))%>%
+      mutate(incomegrp=as.integer(incomegrp))
+    # Check which impact features have missing values RENAME NORMALISED IMPACTS
+    impact_vars <- c("deaths", "cost", "affected", "norm_d", "norm_c", "norm_a")
+    # Rename also in the EM-DAT database
+    emdat%<>%rename(norm_d=norm_deaths,norm_a=norm_affected,norm_c=norm_cost)
+    # Calculate which features have missing values for EM-DAT data so we build a model for each complete-dataset
+    missing_patterns <- emdat %>%
+      select(all_of(impact_vars)) %>%
+      mutate(across(everything(), ~ ifelse(is.na(.), NA_character_, "Present"))) %>%
+      distinct()
+    # Rename the normalised impacts temporarily, otherwise grepl doesn't work
+    mod_res$formula<-str_replace_all(str_replace_all(str_replace_all(mod_res$formula,"norm_deaths","norm_d"),"norm_cost","norm_c"),"norm_affected","norm_a")
+    # Create a list to store results
+    sev_emdat <- data.frame()
+    # Calculate disaster severity!
+    for (i in 1:nrow(missing_patterns)) {
+      # Get the current missing pattern
+      current_pattern <- missing_patterns[i,]
+      # Which models have no missing values for these variables?
+      inds <- !apply(sapply(impact_vars[is.na(current_pattern)], function(x) grepl(x,mod_res$formula)),1,function(y) any(y)) & 
+        apply(sapply(impact_vars[!is.na(current_pattern)],function(x) grepl(x,mod_res$formula)),1,function(y) any(y))
+      # Extract lowest BIC value from these models
+      cattle_f<-mod_res[inds,]%>%filter(dep_var=="cattle" & weight_fac==0 & hazgrp==hazgrp_f)%>%
+        arrange(nBIC)%>%slice(1)%>%pull(formula)
+      crop_f<-mod_res[inds,]%>%filter(dep_var=="crops" & weight_fac==0 & hazgrp==hazgrp_f)%>%
+        arrange(nBIC)%>%slice(1)%>%pull(formula)
+      # # Remember to reconvert back to full normalised impact names
+      # cattle_f<-str_replace_all(str_replace_all(str_replace_all(cattle_f,"norm_d","norm_deaths"),"norm_c","norm_cost"),"norm_a","norm_affected")
+      # crop_f<-str_replace_all(str_replace_all(str_replace_all(crop_f,"norm_d","norm_deaths"),"norm_c","norm_cost"),"norm_a","norm_affected")
+      # Extract indices from EM-DAT and reduce EM-DAT to avoid double counting
+      miniem<-emdat%>%filter(if_all(impact_vars[is.na(current_pattern)],is.na))
+      emdat%<>%filter(!if_all(impact_vars[is.na(current_pattern)],is.na))
+      # Train model
+      model <- suppressMessages(suppressWarnings(try(lme4::lmer(formula = cattle_f, data = dissie, REML = TRUE, verbose = FALSE, weights = dissie$weight), silent = TRUE)))
+      # Predict on EM-DAT
+      # Ensure model did not fail
+      if (!inherits(model, "try-error")) {
+        # Get predicted values
+        preds <- predict(model, newdata = miniem, allow.new.levels = TRUE)
+        # Extract standard deviation of prediction uncertainty
+        uncert <- merTools::predictInterval(model, newdata = miniem, level = 0.95, 
+                                            n.sims = 1000, which = "all", include.resid.var = TRUE)
+        # The standard deviation is estimated from the posterior distribution
+        sddies <- (uncert$upr - uncert$lwr) / (2 * 1.96)
+        # Create output dataframe
+        sev_emdat%<>%rbind(data.frame(mu = preds,
+                              sd = sddies,
+                              dep = "cattle"))
+      } else {
+        print("Model failed to fit; cannot generate cattle predictions.")
+      }
+      # Train model
+      model <- suppressMessages(suppressWarnings(try(lme4::lmer(formula = crop_f, data = dissie, REML = TRUE, verbose = FALSE, weights = dissie$weight), silent = TRUE)))
+      # Predict on EM-DAT
+      # Ensure model did not fail
+      if (!inherits(model, "try-error")) {
+        # Get predicted values
+        preds <- predict(model, newdata = miniem, allow.new.levels = TRUE)
+        # Extract standard deviation of prediction uncertainty
+        uncert <- merTools::predictInterval(model, newdata = miniem, level = 0.95, 
+                                            n.sims = 1000, which = "all", include.resid.var = TRUE)
+        # The standard deviation is estimated from the posterior distribution
+        sddies <- (uncert$upr - uncert$lwr) / (2 * 1.96)
+        # Create output dataframe
+        sev_emdat%<>%rbind(data.frame(mu = preds,
+                                      sd = sddies,
+                                      dep = "crops"))
+      } else {
+        print("Model failed to fit; cannot generate crop predictions.")
+      }
+      
+      
+      
+      
+      
+    }
     
     
-    
-  }
 } else { # infer disaster severity from EM-DAT impact types directly
   stop("EM-DAT-based disaster severity model not ready yet")
   GetDisSev<-function(dissie){
@@ -281,14 +368,12 @@ if(Desinventar){ # infer disaster severity from Desinventar data
 
 ###### TODAY ######
 # Add conflict data - use quantiles then normalise to range of disaster severity values of disaster data
-# Extract models depending on which data is present
-# Calculate adj-R-sq of predictions vs observations
 # CONVERT FROM HECTARES TO TONNES
-# Develop the function to apply the models to the input data from EM-DAT
-# Generate mu+sigma of log-plot
 # Exponentiate sampled values in stan
 # Modify Stan to accept all commodities and not just crops or cattle
 # Run stan code on magpie
+  
+  
 # Model normalised crop and cattle losses using GLM
 # Add datasets into stan file to calculate the losses in production in USD?
 
