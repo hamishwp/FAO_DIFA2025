@@ -1,7 +1,7 @@
 
 if(Desinventar){ # infer disaster severity from Desinventar data
   # Extract the disaster severity estimates
-  GetDisSev<-function(dissie){
+  GetDisSev<-function(dissie,emdat){
     # We need a model for the following features:
     #   input: 
     #       - Desinventar - crops, cattle, deaths, cost, affected, haz_Ab, year, duration, region, income group
@@ -23,7 +23,8 @@ if(Desinventar){ # infer disaster severity from Desinventar data
     
     # Modify certain variables
     dissie%<>%mutate_at(c("duration","deaths","cost","affected","crops","cattle"), function(x) log(x+10))
-    
+    # Set number of folds
+    num_folds <- 10
     # Define independent variables
     imp_sets <- list(
       c("deaths", "cost", "affected"),
@@ -45,7 +46,7 @@ if(Desinventar){ # infer disaster severity from Desinventar data
     fixed_combinations <- generate_subsets(fixed_effects_all) # Fixed effects subsets
     random_combinations <- generate_subsets(random_effects_all) # Random effects subsets
     # Define dependent variables
-    dep_vars <- c("crops", "cattle") #, "cbind(crops,cattle)")
+    dep_vars <- c("crops", "cattle", "norm_crops", "norm_cattle") #, "cbind(crops,cattle)")
     # Weighting function
     calculate_weights <- function(df, factor = 0) {
       # Compute frequencies for haz_grp, region, and incomegrp
@@ -191,7 +192,7 @@ if(Desinventar){ # infer disaster severity from Desinventar data
     # Define weighting factors to iterate over
     weighting_factors <- c(0,0.5,1)
     # Dataframe template
-    mod_res <- list()
+    mod_res <- data.frame()
     # Run it!
     for(ww in weighting_factors){
       # Different hazard grouping models
@@ -217,25 +218,39 @@ if(Desinventar){ # infer disaster severity from Desinventar data
                   calculate_weights(factor = ww)
                 # Ensure enough data for modeling
                 if (nrow(df) > 30) {  
+                  # Ensure reproducibility
+                  set.seed(123)
+                  # Create 10 CV folds
+                  df$fold <- createFolds(df$weight, k = num_folds, list = FALSE)
                   # Model formula
                   formula <- F_model(impact_vars, fixed_vars, random_vars, deppie)
-                  # Run the model
-                  model <- try(lme4::lmer(formula = formula, data = df, REML = T, verbose=F, weights = df$weight),silent=T)
-                  # Store results if successful
-                  if (!inherits(model, "try-error")) {
-                    mod_res[[paste0(as.character(formula)[-1],collapse = " ~ ")]] <- list(
-                      # model = model,
-                      dep_var=deppie,
-                      weight_fac=ww,
-                      hazgrp=j,
-                      formula = paste0(formula, collapse = " "),
-                      BIC = BIC(model),
-                      AIC = AIC(model),
-                      n = nrow(df)
-                    )
-                  } else {
-                    print(paste0("Failed model: ", paste(impact_vars, collapse = ", "), " | ", paste(fixed_vars, collapse = ", "), " | ", paste(random_vars, collapse = ", ")))
+                  # Store BIC and AIC for each fold
+                  bic_values <- aic_values <- c()
+                  # Go through folds
+                  for (fold in 1:num_folds) {
+                    # Training and testing split
+                    train_data <- df %>% filter(fold != fold)
+                    test_data <- df %>% filter(fold == fold)
+                    # Run the model
+                    model <- suppressWarnings(try(lme4::lmer(formula = formula, data = train_data, REML = TRUE, verbose = FALSE, weights = train_data$weight), silent = TRUE))
+                    # Store results if successful
+                    if (!inherits(model, "try-error")) {
+                      bic_values <- c(bic_values, BIC(model))
+                      aic_values <- c(aic_values, AIC(model))
+                    } else {
+                      print(paste0("Failed model at fold ", fold, ": ", paste(impact_vars, collapse = ", "), " | ", paste(fixed_vars, collapse = ", "), " | ", paste(random_vars, collapse = ", ")))
+                    }
                   }
+                  # Store average performance across folds
+                  mod_res %<>% rbind(data.frame(
+                    dep_var = deppie,
+                    weight_fac = ww,
+                    hazgrp = j,
+                    formula = paste0(as.character(formula)[2:3], collapse = " ~ "),
+                    BIC = mean(bic_values),
+                    AIC = mean(aic_values),
+                    n = nrow(df)
+                  ))
                 }
               }
             }
@@ -243,22 +258,10 @@ if(Desinventar){ # infer disaster severity from Desinventar data
         }
       }
     }
-    # Compare models by BIC
-    bench <- data.frame(
-      impact_set = names(mod_res),
-      dep_var = sapply(mod_res, function(x) x$dep_var),
-      # formula = sapply(mod_res, function(x) x$formula),
-      hazgrp = sapply(mod_res, function(x) x$hazgrp),
-      weight_fac=sapply(mod_res, function(x) x$weight_fac),
-      BIC = sapply(mod_res, function(x) x$BIC),
-      AIC = sapply(mod_res, function(x) x$AIC),
-      n = sapply(mod_res, function(x) x$n)
-    ) %>% arrange(BIC)  # Sort by BIC
     # Display the model comparison results
-    View(bench)
+    View(mod_res)
     
-    # Output the best model
-    return(mod_res[[which.max(bench$BIC)]]$model)
+    
     
   }
 } else { # infer disaster severity from EM-DAT impact types directly
@@ -271,9 +274,18 @@ if(Desinventar){ # infer disaster severity from Desinventar data
 
 
 
-
-
-
+###### TODAY ######
+# Add conflict data - use quantiles then normalise to range of disaster severity values of disaster data
+# Extract models depending on which data is present
+# Calculate adj-R-sq of predictions vs observations
+# CONVERT FROM HECTARES TO TONNES
+# Develop the function to apply the models to the input data from EM-DAT
+# Generate mu+sigma of log-plot
+# Exponentiate sampled values in stan
+# Modify Stan to accept all commodities and not just crops or cattle
+# Run stan code on magpie
+# Model normalised crop and cattle losses using GLM
+# Add datasets into stan file to calculate the losses in production in USD?
 
 
 

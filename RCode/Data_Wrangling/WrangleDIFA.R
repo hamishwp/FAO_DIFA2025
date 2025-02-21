@@ -41,6 +41,10 @@ AddRegion<-function(df,isoreg,region="unregion"){
   colnames(isoreg)[2:3]<-c("region","incomegrp")
   # Merge
   df%<>%left_join(isoreg,by = join_by(ISO3==ISO3), relationship="many-to-one")
+  # Replace NAs
+  df$region[is.na(df$region)]<-"Other"
+  
+  return(df)
 }
 
 # This is where we choose which hazards are grouped with which others... big assumptions but it only needs to be vague
