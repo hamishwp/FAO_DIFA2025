@@ -224,19 +224,24 @@ if(Desinventar){ # infer disaster severity from Desinventar data
                   df$fold <- createFolds(df$weight, k = num_folds, list = FALSE)
                   # Model formula
                   formula <- F_model(impact_vars, fixed_vars, random_vars, deppie)
-                  # Store BIC and AIC for each fold
-                  bic_values <- aic_values <- c()
+                  # Store BIC for each fold
+                  bic_values <- c()
                   # Go through folds
                   for (fold in 1:num_folds) {
                     # Training and testing split
                     train_data <- df %>% filter(fold != fold)
                     test_data <- df %>% filter(fold == fold)
                     # Run the model
-                    model <- suppressWarnings(try(lme4::lmer(formula = formula, data = train_data, REML = TRUE, verbose = FALSE, weights = train_data$weight), silent = TRUE))
+                    model <- suppressMessages(suppressWarnings(try(lme4::lmer(formula = formula, data = train_data, REML = TRUE, verbose = FALSE, weights = train_data$weight), silent = TRUE)))
                     # Store results if successful
                     if (!inherits(model, "try-error")) {
-                      bic_values <- c(bic_values, BIC(model))
-                      aic_values <- c(aic_values, AIC(model))
+                      # Compute log-likelihood on test data
+                      LL_test <- logLik(model, newdata = test_data)
+                      # Approximate test BIC using test log-likelihood
+                      k <- length(fixef(model)) # Number of parameters
+                      n_test <- nrow(test_data) # Sample size
+                      test_bic <- -2 * as.numeric(LL_test) + k * log(n_test) # BIC value
+                      bic_values <- c(bic_values, test_bic)
                     } else {
                       print(paste0("Failed model at fold ", fold, ": ", paste(impact_vars, collapse = ", "), " | ", paste(fixed_vars, collapse = ", "), " | ", paste(random_vars, collapse = ", ")))
                     }
@@ -248,7 +253,7 @@ if(Desinventar){ # infer disaster severity from Desinventar data
                     hazgrp = j,
                     formula = paste0(as.character(formula)[2:3], collapse = " ~ "),
                     BIC = mean(bic_values),
-                    AIC = mean(aic_values),
+                    sBIC = sd(bic_values),
                     n = nrow(df)
                   ))
                 }
