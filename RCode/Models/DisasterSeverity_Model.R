@@ -225,10 +225,10 @@ if(Desinventar){ # infer disaster severity from Desinventar data
                   # Store BIC for each fold
                   bic_values <- c()
                   # Go through folds
-                  for (fold in 1:num_folds) {
+                  for (kk in 1:num_folds) {
                     # Training and testing split
-                    train_data <- df %>% filter(fold != fold)
-                    test_data <- df %>% filter(fold == fold)
+                    train_data <- df %>% filter(fold != kk)
+                    test_data <- df %>% filter(fold == kk)
                     # Run the model
                     model <- suppressMessages(suppressWarnings(try(lme4::lmer(formula = formula, data = train_data, REML = TRUE, verbose = FALSE, weights = train_data$weight), silent = TRUE)))
                     # Store results if successful
@@ -236,12 +236,12 @@ if(Desinventar){ # infer disaster severity from Desinventar data
                       # Compute log-likelihood on test data
                       LL_test <- logLik(model, newdata = test_data)
                       # Approximate test BIC using test log-likelihood
-                      k <- length(fixef(model)) # Number of parameters
+                      k <- length(unlist(lme4::ranef(model)))+length(unlist(lme4::fixef(model))) # Number of parameters
                       n_test <- nrow(test_data) # Sample size
                       test_bic <- -2 * as.numeric(LL_test) + k * log(n_test) # BIC value
                       bic_values <- c(bic_values, test_bic)
                     } else {
-                      print(paste0("Failed model at fold ", fold, ": ", paste(impact_vars, collapse = ", "), " | ", paste(fixed_vars, collapse = ", "), " | ", paste(random_vars, collapse = ", ")))
+                      print(paste0("Failed model at fold ", kk, ": ", paste(impact_vars, collapse = ", "), " | ", paste(fixed_vars, collapse = ", "), " | ", paste(random_vars, collapse = ", ")))
                     }
                   }
                   # Store average performance across folds
@@ -304,12 +304,8 @@ if(Desinventar){ # infer disaster severity from Desinventar data
         arrange(nBIC)%>%slice(1)%>%pull(formula)
       crop_f<-mod_res[inds,]%>%filter(dep_var=="crops" & weight_fac==0 & hazgrp==hazgrp_f)%>%
         arrange(nBIC)%>%slice(1)%>%pull(formula)
-      # # Remember to reconvert back to full normalised impact names
-      # cattle_f<-str_replace_all(str_replace_all(str_replace_all(cattle_f,"norm_d","norm_deaths"),"norm_c","norm_cost"),"norm_a","norm_affected")
-      # crop_f<-str_replace_all(str_replace_all(str_replace_all(crop_f,"norm_d","norm_deaths"),"norm_c","norm_cost"),"norm_a","norm_affected")
       # Extract indices from EM-DAT and reduce EM-DAT to avoid double counting
       miniem<-emdat%>%filter(if_all(impact_vars[is.na(current_pattern)],is.na))
-      emdat%<>%filter(!if_all(impact_vars[is.na(current_pattern)],is.na))
       # Train model
       model <- suppressMessages(suppressWarnings(try(lme4::lmer(formula = cattle_f, data = dissie, REML = TRUE, verbose = FALSE, weights = dissie$weight), silent = TRUE)))
       # Predict on EM-DAT
@@ -323,9 +319,11 @@ if(Desinventar){ # infer disaster severity from Desinventar data
         # The standard deviation is estimated from the posterior distribution
         sddies <- (uncert$upr - uncert$lwr) / (2 * 1.96)
         # Create output dataframe
-        sev_emdat%<>%rbind(data.frame(mu = preds,
-                              sd = sddies,
-                              dep = "cattle"))
+        sev_emdat%<>%rbind(data.frame(
+          disno = disno,
+          mu = preds,
+          sd = sddies,
+          dep = "cattle"))
       } else {
         print("Model failed to fit; cannot generate cattle predictions.")
       }
@@ -342,17 +340,20 @@ if(Desinventar){ # infer disaster severity from Desinventar data
         # The standard deviation is estimated from the posterior distribution
         sddies <- (uncert$upr - uncert$lwr) / (2 * 1.96)
         # Create output dataframe
-        sev_emdat%<>%rbind(data.frame(mu = preds,
-                                      sd = sddies,
-                                      dep = "crops"))
+        sev_emdat%<>%rbind(data.frame(
+          disno = disno,
+          mu = preds,
+          sd = sddies,
+          dep = "crops"))
       } else {
         print("Model failed to fit; cannot generate crop predictions.")
       }
-      
-      
-      
-      
-      
+      # Remove any duplicated event predictions
+      sev_emdat%<>%filter(!is.na(mu) & !is.na(sd))%>%
+        arrange(sd)%>%distinct(pick(c(disno,dep)))
+      # Check all events from emdat are in the predictions
+      all(emdat$disno%in%sev_emdat$disno)
+      stop("CHECK ALL EMDAT RECORDS HAVE PREDICTIONS AND NO NANs")
     }
     
     

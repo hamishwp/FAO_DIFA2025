@@ -120,7 +120,7 @@ CleanEMDAT_API<-function(EMDAT){
   #REMOVE IRRELEVANT VARIABLES
   
   EMDAT%<>%select( 
-    -disno,
+    # -disno,
     -external_ids,
     -name,
     -origin,
@@ -157,7 +157,7 @@ CleanEMDAT_API<-function(EMDAT){
     # -Total.Deaths
   )
   
-  colnames(EMDAT)<-c("ISO3","deaths","affected","cost","sdate","fdate","duration","haz_Ab")
+  colnames(EMDAT)<-c("disno","ISO3","deaths","affected","cost","sdate","fdate","duration","haz_Ab")
   
   return(EMDAT)
   
