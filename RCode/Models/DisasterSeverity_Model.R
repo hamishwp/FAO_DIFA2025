@@ -167,26 +167,26 @@ if(Desinventar){ # infer disaster severity from Desinventar data
       "MS"="OT",
       "TC:FL"="ST",
       "DZ"="OT"))
+    # Function to create model formula
+    F_model <- function(impact_vars, fixed_vars, random_vars, deppie="crops") {
+      random_formula <- paste(c("1",impact_vars,random_vars), collapse = " + ")
+      fixed_formula <- paste0(paste0("(", random_formula," | "),fixed_vars,")",collapse = " + ")
+      formula_str <- paste0(deppie," ~ ", fixed_formula)
+      return(as.formula(formula_str))
+    }
     # Define weighting factors to iterate over
-    weighting_factors <- c(0.)
+    weighting_factors <- c(0.); ww<-0.
     # Dataframe template
     mod_res <- data.frame()
     # Run it!
-    for(ww in weighting_factors){
+    # for(ww in weighting_factors){
       # Different hazard grouping models
-      for(j in 1:length(hazgrps)){
+    mod_res<-parallel::mclapply(1:length(hazgrps),function(j){
         # Try changing the number of hazard groups
         dissie%<>%GroupHazs(hazgrps[[j]])
         # For each dependent variable to be modelled
         for(deppie in dep_vars){
           print(deppie)
-          # Function to create model formula
-          F_model <- function(impact_vars, fixed_vars, random_vars, deppie="crops") {
-            random_formula <- paste(c("1",impact_vars,random_vars), collapse = " + ")
-            fixed_formula <- paste0(paste0("(", random_formula," | "),fixed_vars,")",collapse = " + ")
-            formula_str <- paste0(deppie," ~ ", fixed_formula)
-            return(as.formula(formula_str))
-          }
           # Fit models and store results
           for (impact_vars in impact_combinations) {
             for (fixed_vars in fixed_combinations) {
@@ -224,23 +224,25 @@ if(Desinventar){ # infer disaster severity from Desinventar data
                       print(paste0("Failed model at fold ", kk, ": ", paste(impact_vars, collapse = ", "), " | ", paste(fixed_vars, collapse = ", "), " | ", paste(random_vars, collapse = ", ")))
                     }
                   }
-                  # Store average performance across folds
-                  mod_res %<>% rbind(data.frame(
-                    dep_var = deppie,
-                    weight_fac = ww,
-                    hazgrp = j,
-                    formula = paste0(as.character(formula)[2:3], collapse = " ~ "),
-                    BIC = median(bic_values),
-                    sBIC = sd(bic_values),
-                    n = nrow(df)
-                  ))
+                  if(length(bic_values)!=0){
+                    # Store average performance across folds
+                    mod_res %<>% rbind(data.frame(
+                      dep_var = deppie,
+                      weight_fac = ww,
+                      hazgrp = j,
+                      formula = paste0(as.character(formula)[2:3], collapse = " ~ "),
+                      BIC = median(bic_values),
+                      sBIC = sd(bic_values),
+                      n = nrow(df)
+                    ))
+                  }
                 }
               }
             }
           }
         }
-      }
-    }
+      },mc.cores = length(hazgrps))
+    # }
     # BIC value per observation
     mod_res%<>%mutate(nBIC=BIC/n)
     # Display the model comparison results
