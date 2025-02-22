@@ -241,6 +241,7 @@ if(Desinventar){ # infer disaster severity from Desinventar data
             }
           }
         }
+      return(mod_res)
       },mc.cores = length(hazgrps))
     # }
     # BIC value per observation
