@@ -176,8 +176,6 @@ if(Desinventar){ # infer disaster severity from Desinventar data
     }
     # Define weighting factors to iterate over
     weighting_factors <- c(0.); ww<-0.
-    # Dataframe template
-    mod_res <- data.frame()
     # Run it!
     # for(ww in weighting_factors){
       # Different hazard grouping models
