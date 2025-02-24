@@ -13,8 +13,9 @@ CleanUCDP<-function(ucdp){
   colnames(ucdp)<-c("disno","year","deaths","ISO3")
   # Add some of the date variables
   ucdp%>%mutate(sdate=paste0(year,"-01-01"),fdate=paste0(year,"-12-31"),
-                 haz_Ab="CF",haz_grp="CF",duration=1.,
-                 affected=NA,cost=NA)
+                haz_Ab="CF",haz_grp="CF",duration=1.,
+                disno=as.character(disno),
+                affected=NA,cost=NA)
 }
 
 GetUCDP<-function(syear=1990,fyear=NULL){

@@ -5,14 +5,14 @@
 # - Ignacio Acosta
 # - Hamish Patten
 
-# Start and end year of analysis
-syear=1990
-fyear=AsYear(Sys.Date())
 # Do we want to use the Desinventar data to infer disaster severity? If not, use EM-DAT multivariate model
 Desinventar<-T
 # Load the packages & default functions
 source("./RCode/Setup/GetPackages.R")
 source("./RCode/Setup/Functions.R")
+# Start and end year of analysis
+syear=1990
+fyear=AsYear(Sys.Date())
 # Which STAN model to use?
 stan_model_code <- "./RCode/Models/DIFA2025.stan" 
   

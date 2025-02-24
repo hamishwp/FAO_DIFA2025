@@ -8,7 +8,7 @@ GetDisaster<-function(syear=1990,fyear=NULL){
   # Desinventar
   dessie<-GetDesinventar(forcer=F)%>%filter(!is.na(haz_Ab))%>%distinct()
   # UCDP conflict dataset
-  ucdp%<>%GetUCDP()
+  ucdp<-GetUCDP()
   
   return(list(emdat=dplyr::bind_rows(emdat,ucdp),dessie=dessie))
 }
@@ -70,6 +70,7 @@ hazgrp<-c(
   "SS"="ST",
   "MS"="LS",
   "TC:FL"="ST",
+  "CF"="CF",
   "DZ"="ET"
 )
 # Group the hazards together, based on the data and 'expert' judgment
