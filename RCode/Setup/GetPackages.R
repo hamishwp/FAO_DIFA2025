@@ -3,6 +3,7 @@ directory<-paste0(getwd(),"/")
 dir.create("./Data/RawData/",showWarnings = F,recursive = T)
 dir.create("./Plots",showWarnings = F)
 dir.create("./Data/Results/Simulations",showWarnings = F,recursive = T)
+dir.create("./Data/RawData/UCDP/",showWarnings = F,recursive = T)
 
 if(!file.exists(paste0(directory,'RCode/Setup/GetEnv.R'))) 
   file.copy(paste0(directory,'RCode/Setup/GetEnv_Example.R'),
@@ -66,7 +67,7 @@ GetPackages<-function(packred=T){
                         "RColorBrewer", "reshape2","countrycode", 'doParallel', 'abind',
                         'openxlsx',"plotly","openxlsx","pracma","ghql","jsonlite","kableExtra",
                         "rworldmap","rworldxtra","data.table","FAOSTAT","readxl",
-                        "combinat","lme4","merTools")
+                        "combinat","lme4","merTools","furrr","states")
   
   new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
   if(length(new.packages)>0) install.packages(new.packages, repos='http://cran.us.r-project.org')

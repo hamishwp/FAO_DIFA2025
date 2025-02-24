@@ -7,8 +7,10 @@ GetDisaster<-function(syear=1990,fyear=NULL){
   emdat<-API_EMDAT(syear=syear,fyear=fyear)%>%distinct()%>%arrange(sdate)%>%filter(!is.na(haz_Ab))
   # Desinventar
   dessie<-GetDesinventar(forcer=F)%>%filter(!is.na(haz_Ab))%>%distinct()
+  # UCDP conflict dataset
+  ucdp%<>%GetUCDP()
   
-  return(list(emdat=emdat,dessie=dessie))
+  return(list(emdat=dplyr::bind_rows(emdat,ucdp),dessie=dessie))
 }
 
 # normalise the population-, GDP- and area-related variables by national totals

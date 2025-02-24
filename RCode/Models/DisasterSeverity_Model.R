@@ -178,69 +178,70 @@ if(Desinventar){ # infer disaster severity from Desinventar data
     weighting_factors <- c(0.); ww<-0.
     # Run it!
     # for(ww in weighting_factors){
-      # Different hazard grouping models
-    mod_res<-parallel::mclapply(1:length(hazgrps),function(j){
-        # Try changing the number of hazard groups
-        dissie%<>%GroupHazs(hazgrps[[j]])
-        # For each dependent variable to be modelled
-        for(deppie in dep_vars){
-          print(deppie)
-          # Fit models and store results
-          for (impact_vars in impact_combinations) {
-            for (fixed_vars in fixed_combinations) {
-              for (random_vars in random_combinations) {
-                # Ensure only complete records are modelled
-                df <- dissie %>% filter(complete.cases(select(., all_of(c(impact_vars, fixed_vars, random_vars)))))%>%
-                  calculate_weights(factor = ww)
-                # Ensure enough data for modeling
-                if (nrow(df) > 30) {  
-                  # Ensure reproducibility
-                  set.seed(123)
-                  # Create 10 CV folds
-                  df$fold <- caret::createFolds(df$weight, k = num_folds, list = FALSE)
-                  # Model formula
-                  formula <- F_model(impact_vars, fixed_vars, random_vars, deppie)
-                  # Store BIC for each fold
-                  bic_values <- c()
-                  # Go through folds
-                  for (kk in 1:num_folds) {
-                    # Training and testing split
-                    train_data <- df %>% filter(fold != kk)
-                    test_data <- df %>% filter(fold == kk)
-                    # Run the model
-                    model <- suppressMessages(suppressWarnings(try(lme4::lmer(formula = formula, data = train_data, REML = TRUE, verbose = FALSE, weights = train_data$weight), silent = TRUE)))
-                    # Store results if successful
-                    if (!inherits(model, "try-error")) {
-                      # Compute log-likelihood on test data
-                      LL_test <- logLik(model, newdata = test_data)
-                      # Approximate test BIC using test log-likelihood
-                      k <- length(unlist(lme4::ranef(model)))+length(unlist(lme4::fixef(model))) # Number of parameters
-                      n_test <- nrow(test_data) # Sample size
-                      test_bic <- -2 * as.numeric(LL_test) + k * log(n_test) # BIC value
-                      bic_values <- c(bic_values, test_bic)
-                    } else {
-                      print(paste0("Failed model at fold ", kk, ": ", paste(impact_vars, collapse = ", "), " | ", paste(fixed_vars, collapse = ", "), " | ", paste(random_vars, collapse = ", ")))
-                    }
+    # Dataframe template
+    mod_res<-data.frame()
+    # Different hazard grouping models
+    for (j in 1:length(hazgrps)){
+      # Try changing the number of hazard groups
+      disloc<-dissie%>%GroupHazs(hazgrps[[j]])
+      # For each dependent variable to be modelled
+      for(deppie in dep_vars){
+        print(deppie)
+        # Fit models and store results
+        for (impact_vars in impact_combinations) {
+          for (fixed_vars in fixed_combinations) {
+            for (random_vars in random_combinations) {
+              # Ensure only complete records are modelled
+              df <- disloc %>% filter(complete.cases(select(., all_of(c(impact_vars, fixed_vars, random_vars)))))%>%
+                calculate_weights(factor = ww)
+              # Ensure enough data for modeling
+              if (nrow(df) > 30) {  
+                # Ensure reproducibility
+                set.seed(123)
+                # Create 10 CV folds
+                df$fold <- caret::createFolds(df$weight, k = num_folds, list = FALSE)
+                # Model formula
+                formula <- F_model(impact_vars, fixed_vars, random_vars, deppie)
+                # Store BIC for each fold
+                bic_values <- c()
+                # Go through folds
+                for (kk in 1:num_folds) {
+                  # Training and testing split
+                  train_data <- df %>% filter(fold != kk)
+                  test_data <- df %>% filter(fold == kk)
+                  # Run the model
+                  model <- suppressMessages(suppressWarnings(try(lme4::lmer(formula = formula, data = train_data, REML = TRUE, verbose = FALSE, weights = train_data$weight), silent = TRUE)))
+                  # Store results if successful
+                  if (!inherits(model, "try-error")) {
+                    # Compute log-likelihood on test data
+                    LL_test <- logLik(model, newdata = test_data)
+                    # Approximate test BIC using test log-likelihood
+                    k <- length(unlist(lme4::ranef(model)))+length(unlist(lme4::fixef(model))) # Number of parameters
+                    n_test <- nrow(test_data) # Sample size
+                    test_bic <- -2 * as.numeric(LL_test) + k * log(n_test) # BIC value
+                    bic_values <- c(bic_values, test_bic)
+                  } else {
+                    print(paste0("Failed model at fold ", kk, ": ", paste(impact_vars, collapse = ", "), " | ", paste(fixed_vars, collapse = ", "), " | ", paste(random_vars, collapse = ", ")))
                   }
-                  if(length(bic_values)!=0){
-                    # Store average performance across folds
-                    mod_res %<>% rbind(data.frame(
-                      dep_var = deppie,
-                      weight_fac = ww,
-                      hazgrp = j,
-                      formula = paste0(as.character(formula)[2:3], collapse = " ~ "),
-                      BIC = median(bic_values),
-                      sBIC = sd(bic_values),
-                      n = nrow(df)
-                    ))
-                  }
+                }
+                if(length(bic_values)!=0){
+                  # Store average performance across folds
+                  mod_res %<>% rbind(data.frame(
+                    dep_var = deppie,
+                    weight_fac = ww,
+                    hazgrp = j,
+                    formula = paste0(as.character(formula)[2:3], collapse = " ~ "),
+                    BIC = median(bic_values),
+                    sBIC = sd(bic_values),
+                    n = nrow(df)
+                  ))
                 }
               }
             }
           }
         }
-      return(mod_res)
-      },mc.cores = length(hazgrps))
+      }
+    }
     # }
     # BIC value per observation
     mod_res%<>%mutate(nBIC=BIC/n)
@@ -248,7 +249,7 @@ if(Desinventar){ # infer disaster severity from Desinventar data
     View(mod_res)
     # Find the ideal hazard grouping
     tby_hzgp<-mod_res%>%filter(weight_fac==0)%>%arrange(BIC)%>%group_by(dep_var,n)%>%slice(1)%>%ungroup()%>%pull(hazgrp)%>%table()
-    hazgrp_f<-as.integer(names(tby_hzgp)[which.max(tby_hzgp)]); hazgrp_f<-2
+    hazgrp_f<-as.integer(names(tby_hzgp)[which.max(tby_hzgp)])
     # Prepare the Desinventar and EM-DAT datasets
     dissie %<>% GroupHazs(hazgrps[[hazgrp_f]]) %>% calculate_weights(factor = 0)
     emdat %<>% GroupHazs(hazgrps[[hazgrp_f]])
@@ -264,6 +265,9 @@ if(Desinventar){ # infer disaster severity from Desinventar data
     impact_vars <- c("deaths", "cost", "affected", "norm_d", "norm_c", "norm_a")
     # Rename also in the EM-DAT database
     emdat%<>%rename(norm_d=norm_deaths,norm_a=norm_affected,norm_c=norm_cost)
+    dissie%<>%rename(norm_d=norm_deaths,norm_a=norm_affected,norm_c=norm_cost)
+    # Remove all records where all impacts are NAs
+    emdat%<>%filter(!apply(emdat[,impact_vars],1,function(x) all(is.na(x))))
     # Calculate which features have missing values for EM-DAT data so we build a model for each complete-dataset
     missing_patterns <- emdat %>%
       select(all_of(impact_vars)) %>%
@@ -278,8 +282,9 @@ if(Desinventar){ # infer disaster severity from Desinventar data
       # Get the current missing pattern
       current_pattern <- missing_patterns[i,]
       # Which models have no missing values for these variables?
-      inds <- !apply(sapply(impact_vars[is.na(current_pattern)], function(x) grepl(x,mod_res$formula)),1,function(y) any(y)) & 
-        apply(sapply(impact_vars[!is.na(current_pattern)],function(x) grepl(x,mod_res$formula)),1,function(y) any(y))
+      inds <- !logical(nrow(mod_res))
+      if(length(impact_vars[is.na(current_pattern)])>0) inds <- inds & !apply(sapply(impact_vars[is.na(current_pattern)], function(x) grepl(x,mod_res$formula)),1,function(y) any(y))
+      if(length(impact_vars[!is.na(current_pattern)])>0) inds <- inds & apply(sapply(impact_vars[!is.na(current_pattern)],function(x) grepl(x,mod_res$formula)),1,function(y) any(y))
       # Extract lowest BIC value from these models
       cattle_f<-mod_res[inds,]%>%filter(dep_var=="cattle" & weight_fac==0 & hazgrp==hazgrp_f)%>%
         arrange(nBIC)%>%slice(1)%>%pull(formula)
@@ -300,13 +305,12 @@ if(Desinventar){ # infer disaster severity from Desinventar data
         # The standard deviation is estimated from the posterior distribution
         sddies <- (uncert$upr - uncert$lwr) / (2 * 1.96)
         # Create output dataframe
-        sev_emdat%<>%rbind(data.frame(
-          disno = disno,
-          mu = preds,
-          sd = sddies,
-          dep = "cattle"))
+        sev_emdat%<>%rbind(cbind(miniem,data.frame(
+          mu = as.numeric(preds),
+          sd = as.numeric(sddies),
+          dep = "cattle")))
       } else {
-        print("Model failed to fit; cannot generate cattle predictions.")
+        stop("Model failed to fit; cannot generate cattle predictions.")
       }
       # Train model
       model <- suppressMessages(suppressWarnings(try(lme4::lmer(formula = crop_f, data = dissie, REML = TRUE, verbose = FALSE, weights = dissie$weight), silent = TRUE)))
@@ -321,23 +325,64 @@ if(Desinventar){ # infer disaster severity from Desinventar data
         # The standard deviation is estimated from the posterior distribution
         sddies <- (uncert$upr - uncert$lwr) / (2 * 1.96)
         # Create output dataframe
-        sev_emdat%<>%rbind(data.frame(
-          disno = disno,
-          mu = preds,
-          sd = sddies,
-          dep = "crops"))
+        sev_emdat%<>%rbind(cbind(miniem,data.frame(
+          mu = as.numeric(preds),
+          sd = as.numeric(sddies),
+          dep = "crops")))
       } else {
-        print("Model failed to fit; cannot generate crop predictions.")
+        stop("Model failed to fit; cannot generate crop predictions.")
       }
-      # Remove any duplicated event predictions
-      sev_emdat%<>%filter(!is.na(mu) & !is.na(sd))%>%
-        arrange(sd)%>%distinct(pick(c(disno,dep)))
-      # Check all events from emdat are in the predictions
-      all(emdat$disno%in%sev_emdat$disno)
-      stop("CHECK ALL EMDAT RECORDS HAVE PREDICTIONS AND NO NANs")
     }
+    # Remove any duplicated event predictions
+    sev_emdat%<>%filter(!is.na(mu) & !is.na(sd))%>%
+      arrange(sd)%>%distinct(pick(c(disno,dep)),.keep_all = T)
+    # Check all events from emdat are in the predictions
+    length(unique(sev_emdat$disno[sev_emdat$dep=="cattle"]))
+    length(unique(sev_emdat$disno[sev_emdat$dep=="crops"]))
+    sum(!emdat$disno%in%unique(sev_emdat$disno[sev_emdat$dep=="cattle"]))
+    sum(!emdat$disno%in%unique(sev_emdat$disno[sev_emdat$dep=="crops"]))
+    sum(apply(emdat[!emdat$disno%in%unique(sev_emdat$disno[sev_emdat$dep=="cattle"]),impact_vars],1,function(x) any(is.na(x))))
+    sum(apply(emdat[!emdat$disno%in%unique(sev_emdat$disno[sev_emdat$dep=="crops"]),impact_vars],1,function(x) any(is.na(x))))
     
+    p<-sev_emdat%>%
+      pivot_longer(cols = impact_vars[1:3], values_to = "values",names_to = "impact")%>%
+      ggplot()+geom_point(aes(exp(values),exp(mu)),alpha=0.1)+
+      geom_smooth(aes(exp(values),exp(mu),colour=impact),se =F )+
+      xlab("Observed Impact")+ylab("Predicted Impact")+
+      scale_x_log10(
+        breaks = scales::trans_breaks("log10", function(x) 10^x),
+        labels = scales::trans_format("log10", scales::math_format(10^.x))
+      ) +
+      scale_y_log10(
+        breaks = scales::trans_breaks("log10", function(x) 10^x),
+        labels = scales::trans_format("log10", scales::math_format(10^.x))
+      ) +
+      theme_bw()+
+      facet_wrap(~dep+impact,scales = "free");p
+    ggsave("EMDAT_DisSev_Corrplot.png",p,path="./Plots",width=12,height=10)
     
+    sev_emdat[,c("mu",impact_vars[1:3])]%>%pairs()
+      
+    sev_emdat$mu[sev_emdat$mu>25]<-25
+    
+    sev_emdat$proportion<-sev_emdat$mu/sev_emdat$surfarea
+    
+    p<-sev_emdat%>%ggplot()+
+      geom_point(aes(exp(mu),proportion),alpha=0.1)+
+      ylab("Proportion of Country Area")+xlab("Predicted Impact")+
+      scale_x_log10(
+        breaks = scales::trans_breaks("log10", function(x) 10^x),
+        labels = scales::trans_format("log10", scales::math_format(10^.x))
+      ) +
+      scale_y_log10(
+        breaks = scales::trans_breaks("log10", function(x) 10^x),
+        labels = scales::trans_format("log10", scales::math_format(10^.x))
+      ) +
+      theme_bw();p
+    ggsave("EMDAT_DisSev_Proportion_Corrplot.png",p,path="./Plots",width=7,height=5)
+    
+    return(sev_emdat)
+  }
 } else { # infer disaster severity from EM-DAT impact types directly
   stop("EM-DAT-based disaster severity model not ready yet")
   GetDisSev<-function(dissie){
@@ -350,6 +395,7 @@ if(Desinventar){ # infer disaster severity from Desinventar data
 
 ###### TODAY ######
 # Add conflict data - use quantiles then normalise to range of disaster severity values of disaster data
+# Select only top-20 events per hazard group, per country
 # CONVERT FROM HECTARES TO TONNES
 # Exponentiate sampled values in stan
 # Modify Stan to accept all commodities and not just crops or cattle

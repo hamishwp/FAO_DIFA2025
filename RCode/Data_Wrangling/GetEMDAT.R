@@ -299,15 +299,14 @@ API_EMDAT<-function(syear=1991,fyear=NULL){
 #   
 # }
 
-GET_EMDAT_MODEL <- function(){
-  # FORMAT EM-DAT
+GET_EMDAT_MODEL <- function(emdat=NULL){
+  # Extract the data if it is not provided
+  if(is.null(emdat)) emdat <- API_EMDAT()
   
-  disaster_data <- API_EMDAT()
+  emdat$sdate <- as.Date(emdat$sdate)
+  emdat$fdate <- as.Date(emdat$fdate)
   
-  disaster_data$sdate <- as.Date(disaster_data$sdate)
-  disaster_data$fdate <- as.Date(disaster_data$fdate)
-  
-  disaster_data <- disaster_data %>%
+  emdat <- emdat %>%
     mutate(
       sdate = as.Date(sdate),
       fdate = as.Date(fdate),
@@ -319,11 +318,11 @@ GET_EMDAT_MODEL <- function(){
       endt = sy + s_frac + duration_years     
     )
   
-  years_all <- seq(min(disaster_data$sy), max(disaster_data$ey))
+  years_all <- seq(min(emdat$sy), max(emdat$ey))
   
-  isos <- unique(disaster_data$ISO3)
+  isos <- unique(emdat$ISO3)
   
-  max_events <- disaster_data%>% 
+  max_events <- emdat%>% 
     group_by(ISO3)%>% 
     summarise(n = n())%>%
     pull(n)%>%
@@ -353,22 +352,22 @@ GET_EMDAT_MODEL <- function(){
     dimnames = list(isos, as.character(years_all), NULL)
   )
   
-  disaster_data%<>% 
+  emdat%<>% 
     arrange(ISO3, sdate)%>% 
     group_by(ISO3)%>% 
     mutate(
       event_id = row_number()
     )
   
-  for(i in 1:nrow(disaster_data)){
-    iso <- disaster_data$ISO3[i]
-    event <- disaster_data$event_id[i]
-    sy <- disaster_data$sy[i]      
-    ey <- disaster_data$ey[i]      
-    sfrac <- disaster_data$s_frac[i]
-    efrac <- disaster_data$e_frac[i]
-    duration_years <- disaster_data$duration_years[i]
-    endt <- disaster_data$endt[i]
+  for(i in 1:nrow(emdat)){
+    iso <- emdat$ISO3[i]
+    event <- emdat$event_id[i]
+    sy <- emdat$sy[i]      
+    ey <- emdat$ey[i]      
+    sfrac <- emdat$s_frac[i]
+    efrac <- emdat$e_frac[i]
+    duration_years <- emdat$duration_years[i]
+    endt <- emdat$endt[i]
     
     for(t in as.numeric(sy):as.numeric(max(years_all))){
       t_chr <- as.character(t)
