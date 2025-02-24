@@ -22,14 +22,13 @@ execDIFA<-function(){
   difa<-getData(syear=syear,fyear=fyear)
   # Train the disaster severity model and predict on EM-DAT+UCDP data
   sevvies<-GetDisSev(difa$dissie$dessie,difa$dissie$emdat)%>%
+    convHe2Tonnes(difa$faostat)
+  # Prepare the data to be input into the stan model
+  fdf<-Prepare4Model(difa,sevvies)
   # Train the model
-  mGPR<-TrainModel(df=difa,model=stan_model_code)
-  # Generate counterfactuals (depending on trained model)
-  cntfcts<-counterfacts(df=difa,model=mGPR)
-  # Add economic losses
-  cntfcts%<>%addEconomics()
+  mGPR<-TrainModel(df=fdf,model=stan_model_code)
   
   return(list(difa=difa,
-              mGPR=mGPR,
-              cntfcts=cntfcts))
+              fdf=fdf,
+              mGPR=mGPR))
 }

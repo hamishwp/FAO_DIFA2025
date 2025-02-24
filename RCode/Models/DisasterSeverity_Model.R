@@ -401,8 +401,8 @@ if(Desinventar){ # infer disaster severity from Desinventar data
 
 
 ###### TODAY ######
-# Select only top-20 events per hazard group, per country
 # CONVERT FROM HECTARES TO TONNES
+# Select only top-20 events per hazard group, per country
 # Modify Stan to accept all commodities and not just crops or cattle
 # Add datasets into stan file to calculate the losses in production in USD via the generated_quantities?
 # Run stan code on magpie

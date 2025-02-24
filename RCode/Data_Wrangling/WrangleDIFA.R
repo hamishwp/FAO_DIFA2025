@@ -94,6 +94,10 @@ AddLivestock<-function(wb,faostat){
   wb%>%left_join(livestock,by=join_by(ISO3==ISO3.CODE,year==Year))
 }
 
+ConvHe2Tonnes<-function(sevvies,faostat){
+  
+}
+
 # Prepare the DIFA data to have it in the correct format for modelling
 PrepDIFA<-function(difa){
   # Normalise both the EM-DAT and Desinventar datasets
