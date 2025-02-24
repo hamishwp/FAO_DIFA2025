@@ -86,6 +86,7 @@ if(Desinventar){ # infer disaster severity from Desinventar data
       "SS"="ST",
       "MS"="LS",
       "TC:FL"="ST",
+      "CF"="OT",
       "DZ"="ET"),
     c("CW"="OT",
       "DR"="DR",
@@ -106,6 +107,7 @@ if(Desinventar){ # infer disaster severity from Desinventar data
       "SS"="ST",
       "MS"="OT",
       "TC:FL"="ST",
+      "CF"="OT",
       "DZ"="OT"),
     c("CW"="OT",
       "DR"="DR",
@@ -126,6 +128,7 @@ if(Desinventar){ # infer disaster severity from Desinventar data
       "SS"="OT",
       "MS"="OT",
       "TC:FL"="OT",
+      "CF"="OT",
       "DZ"="OT"),
     c("CW"="OT",
       "DR"="DR",
@@ -146,6 +149,7 @@ if(Desinventar){ # infer disaster severity from Desinventar data
       "SS"="OT",
       "MS"="OT",
       "TC:FL"="OT",
+      "CF"="OT",
       "DZ"="OT"),
     c("CW"="OT",
       "DR"="DR",
@@ -166,6 +170,7 @@ if(Desinventar){ # infer disaster severity from Desinventar data
       "SS"="OT",
       "MS"="OT",
       "TC:FL"="ST",
+      "CF"="OT",
       "DZ"="OT"))
     # Function to create model formula
     F_model <- function(impact_vars, fixed_vars, random_vars, deppie="crops") {
@@ -276,7 +281,7 @@ if(Desinventar){ # infer disaster severity from Desinventar data
     # Rename the normalised impacts temporarily, otherwise grepl doesn't work
     mod_res$formula<-str_replace_all(str_replace_all(str_replace_all(mod_res$formula,"norm_deaths","norm_d"),"norm_cost","norm_c"),"norm_affected","norm_a")
     # Create a list to store results
-    sev_emdat <- data.frame()
+    sevvies <- data.frame()
     # Calculate disaster severity!
     for (i in 1:nrow(missing_patterns)) {
       # Get the current missing pattern
@@ -305,7 +310,7 @@ if(Desinventar){ # infer disaster severity from Desinventar data
         # The standard deviation is estimated from the posterior distribution
         sddies <- (uncert$upr - uncert$lwr) / (2 * 1.96)
         # Create output dataframe
-        sev_emdat%<>%rbind(cbind(miniem,data.frame(
+        sevvies%<>%rbind(cbind(miniem,data.frame(
           mu = as.numeric(preds),
           sd = as.numeric(sddies),
           dep = "cattle")))
@@ -325,7 +330,7 @@ if(Desinventar){ # infer disaster severity from Desinventar data
         # The standard deviation is estimated from the posterior distribution
         sddies <- (uncert$upr - uncert$lwr) / (2 * 1.96)
         # Create output dataframe
-        sev_emdat%<>%rbind(cbind(miniem,data.frame(
+        sevvies%<>%rbind(cbind(miniem,data.frame(
           mu = as.numeric(preds),
           sd = as.numeric(sddies),
           dep = "crops")))
@@ -334,17 +339,19 @@ if(Desinventar){ # infer disaster severity from Desinventar data
       }
     }
     # Remove any duplicated event predictions
-    sev_emdat%<>%filter(!is.na(mu) & !is.na(sd))%>%
+    sevvies%<>%filter(!is.na(mu) & !is.na(sd))%>%
       arrange(sd)%>%distinct(pick(c(disno,dep)),.keep_all = T)
+    # Make sure to convert back the conflict hazard codes
+    sevvies$haz_grp[sevvies$haz_Ab=="CF"]<-"CF"
     # Check all events from emdat are in the predictions
-    length(unique(sev_emdat$disno[sev_emdat$dep=="cattle"]))
-    length(unique(sev_emdat$disno[sev_emdat$dep=="crops"]))
-    sum(!emdat$disno%in%unique(sev_emdat$disno[sev_emdat$dep=="cattle"]))
-    sum(!emdat$disno%in%unique(sev_emdat$disno[sev_emdat$dep=="crops"]))
-    sum(apply(emdat[!emdat$disno%in%unique(sev_emdat$disno[sev_emdat$dep=="cattle"]),impact_vars],1,function(x) any(is.na(x))))
-    sum(apply(emdat[!emdat$disno%in%unique(sev_emdat$disno[sev_emdat$dep=="crops"]),impact_vars],1,function(x) any(is.na(x))))
+    length(unique(sevvies$disno[sevvies$dep=="cattle"]))
+    length(unique(sevvies$disno[sevvies$dep=="crops"]))
+    sum(!emdat$disno%in%unique(sevvies$disno[sevvies$dep=="cattle"]))
+    sum(!emdat$disno%in%unique(sevvies$disno[sevvies$dep=="crops"]))
+    sum(apply(emdat[!emdat$disno%in%unique(sevvies$disno[sevvies$dep=="cattle"]),impact_vars],1,function(x) any(is.na(x))))
+    sum(apply(emdat[!emdat$disno%in%unique(sevvies$disno[sevvies$dep=="crops"]),impact_vars],1,function(x) any(is.na(x))))
     
-    p<-sev_emdat%>%
+    p<-sevvies%>%
       pivot_longer(cols = impact_vars[1:3], values_to = "values",names_to = "impact")%>%
       ggplot()+geom_point(aes(exp(values),exp(mu)),alpha=0.1)+
       geom_smooth(aes(exp(values),exp(mu),colour=impact),se =F )+
@@ -361,13 +368,13 @@ if(Desinventar){ # infer disaster severity from Desinventar data
       facet_wrap(~dep+impact,scales = "free");p
     ggsave("EMDAT_DisSev_Corrplot.png",p,path="./Plots",width=12,height=10)
     
-    sev_emdat[,c("mu",impact_vars[1:3])]%>%pairs()
+    sevvies[,c("mu",impact_vars[1:3])]%>%pairs()
       
-    sev_emdat$mu[sev_emdat$mu>25]<-25
+    sevvies$mu[sevvies$mu>25]<-25
     
-    sev_emdat$proportion<-sev_emdat$mu/sev_emdat$surfarea
+    sevvies$proportion<-sevvies$mu/sevvies$surfarea
     
-    p<-sev_emdat%>%ggplot()+
+    p<-sevvies%>%ggplot()+
       geom_point(aes(exp(mu),proportion),alpha=0.1)+
       ylab("Proportion of Country Area")+xlab("Predicted Impact")+
       scale_x_log10(
@@ -381,11 +388,11 @@ if(Desinventar){ # infer disaster severity from Desinventar data
       theme_bw();p
     ggsave("EMDAT_DisSev_Proportion_Corrplot.png",p,path="./Plots",width=7,height=5)
     
-    return(sev_emdat)
+    return(sevvies)
   }
 } else { # infer disaster severity from EM-DAT impact types directly
   stop("EM-DAT-based disaster severity model not ready yet")
-  GetDisSev<-function(dissie){
+  GetDisSev<-function(dissie,emdat){
     # 
   }
 }
@@ -394,17 +401,11 @@ if(Desinventar){ # infer disaster severity from Desinventar data
 
 
 ###### TODAY ######
-# Add conflict data - use quantiles then normalise to range of disaster severity values of disaster data
 # Select only top-20 events per hazard group, per country
 # CONVERT FROM HECTARES TO TONNES
-# Exponentiate sampled values in stan
 # Modify Stan to accept all commodities and not just crops or cattle
+# Add datasets into stan file to calculate the losses in production in USD via the generated_quantities?
 # Run stan code on magpie
-  
-  
-# Model normalised crop and cattle losses using GLM
-# Add datasets into stan file to calculate the losses in production in USD?
-
 
 
 

@@ -141,7 +141,7 @@ data_list <- list(
   tf = tf,
   hazdur = hazdur,
   htype = htype,
-  iprox = iprox,
+  iprox = log(iprox),
   mu_AR1 = mu_AR1,
   sig_AR1 = sig_AR1
 )

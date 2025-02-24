@@ -74,7 +74,7 @@ model {
      // Sum all the contributing disaster components if there are any non-zero values
      if(sum(flag_vec)>0){
        // Save on computation
-       vector[n_dis[iso]] iprox_vec = to_vector(iprox[iso, 1:n_dis[iso]]);
+       vector[n_dis[iso]] iprox_vec = exp(to_vector(iprox[iso, 1:n_dis[iso]]));
        vector[n_dis[iso]] iphs = iprox_vec ./ hsev[htype[iso, 1:n_dis[iso]]];
        // Calculate the disaster severity
        dsev = sum(flag_vec.*(

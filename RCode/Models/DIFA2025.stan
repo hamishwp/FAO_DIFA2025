@@ -69,7 +69,7 @@ model {
    // Decompose the GPR covariance matrix
    matrix[n_t, n_t] L_K = cholesky_decompose(K);
    // Sample the estimated impact value in crop losses = impact proxy
-   iprox[iso,1:n_dis[iso]] ~ gamma(alpha_dis[iso, 1:n_dis[iso]], lambda_dis[iso, 1:n_dis[iso]]);
+   iprox[iso,1:n_dis[iso]] ~ normal(alpha_dis[iso, 1:n_dis[iso]], lambda_dis[iso, 1:n_dis[iso]]);
    // Sample through the EOY values
    for(ttt in 1:n_t){
      // Set the disaster severity to zero at first, as well as the GPR mean function
@@ -79,7 +79,7 @@ model {
      // Sum all the contributing disaster components if there are any non-zero values
      if(sum(flag_vec)>0){
        // Save on computation
-       vector[n_dis[iso]] iprox_vec = to_vector(iprox[iso, 1:n_dis[iso]]);
+       vector[n_dis[iso]] iprox_vec = exp(to_vector(iprox[iso, 1:n_dis[iso]]));
        vector[n_dis[iso]] iphs = iprox_vec ./ hsev[htype[iso, 1:n_dis[iso]]];
        // Calculate the disaster severity
        dsev = sum(flag_vec.*(

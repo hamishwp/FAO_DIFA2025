@@ -18,14 +18,18 @@ GetSourceFiles<-function(){
   # Disaster related:
   source(paste0(directory,'RCode/Data_Wrangling/GetDesinventar.R'))
   source(paste0(directory,'RCode/Data_Wrangling/GetEMDAT.R'))
+  source(paste0(directory,'RCode/Data_Wrangling/GetUCDP.R'))
   # Food and agriculture related:
   source(paste0(directory,'RCode/Data_Wrangling/GetFAOSTAT.R'))
   # Other key datasets required:
   source(paste0(directory,'RCode/Data_Wrangling/GetWorldBank.R'))
+  source(paste0(directory,'RCode/Data_Wrangling/GetISORegions.R'))
   # Data processing functions
   source(paste0(directory,'RCode/Data_Wrangling/WrangleDIFA.R'))
-  source(paste0(directory,'RCode/Data_Wrangling/GetISORegions.R'))
+  # Models required
+  source(paste0(directory,'RCode/Models/DisasterSeverity_Model.R'))
   
+  return(T)
 }
 
 LoadLibraries<-function(){
@@ -59,6 +63,7 @@ LoadLibraries<-function(){
   # library(uuid)
   # library(lwgeom)
   
+  return(T)
 }
 
 GetPackages<-function(packred=T){
@@ -79,6 +84,7 @@ GetPackages<-function(packred=T){
   LoadLibraries()
   GetSourceFiles()
   
+  return(T)
 }
 
 GetPackages() 
