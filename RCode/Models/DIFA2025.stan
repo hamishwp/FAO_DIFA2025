@@ -3,7 +3,7 @@
 // - duration must be in years, not days
 // - check conversion of array dimensions from R to stan: row-column or column-row?
 // - check whether normal(mu_dis[iso, 1:n_dis[iso]], sigma_dis[iso, 1:n_dis[iso]]) needs to be iterated over instead of the vector input
-// - alpha_dis and lambda_dis must have 0 and near 0 values, resp, for all array elements that do not have disasters in the iprox[n_isos,n_dis] array
+// - mu_dis and sig_dis must have 0 and near 0 values, resp, for all array elements that do not have disasters in the iprox[n_isos,n_dis] array
 
 data {
   // Data dimensions
@@ -26,9 +26,9 @@ data {
   // Hazard type of the disaster
   array[n_isos, max(n_dis)] int <lower = 0> htype;
   // (Gamma) Shape value of disaster severity, per disaster
-  array[n_isos, max(n_dis)] real<lower=0> alpha_dis;
+  array[n_isos, max(n_dis)] real<lower=0> mu_dis;
   // (Gamma) Rate of disaster severity, per disaster
-  array[n_isos, max(n_dis)] real<lower=0> lambda_dis;
+  array[n_isos, max(n_dis)] real<lower=0> sig_dis;
   // Mean AR1 trend in commodity data, per country
   vector[n_isos] mu_AR1;
   // Standard deviation in AR1 trend in commodity data, per country
@@ -69,7 +69,7 @@ model {
    // Decompose the GPR covariance matrix
    matrix[n_t, n_t] L_K = cholesky_decompose(K);
    // Sample the estimated impact value in crop losses = impact proxy
-   iprox[iso,1:n_dis[iso]] ~ normal(alpha_dis[iso, 1:n_dis[iso]], lambda_dis[iso, 1:n_dis[iso]]);
+   iprox[iso,1:n_dis[iso]] ~ normal(mu_dis[iso, 1:n_dis[iso]], sig_dis[iso, 1:n_dis[iso]]);
    // Sample through the EOY values
    for(ttt in 1:n_t){
      // Set the disaster severity to zero at first, as well as the GPR mean function

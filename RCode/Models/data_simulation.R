@@ -159,8 +159,8 @@ rstan_options(auto_write = TRUE)
 # stan_model_code <- "./RCode/Models/DIFA2025_redredDisSev.stan"  # Specify your Stan model path
 stan_model_code <- "./RCode/Models/DIFA2025_redDisSev.stan"  # Specify your Stan model path
 if(grepl("DIFA2025.stan",stan_model_code) | grepl("DIFA2025_csev.stan",stan_model_code)) {
-  data_list$alpha_dis<-array(2,dim = c(n_isos,max(n_dis)))
-  data_list$lambda_dis<-array(0.1,dim = c(n_isos,max(n_dis)))
+  data_list$mu_dis<-array(2,dim = c(n_isos,max(n_dis)))
+  data_list$sig_dis<-array(0.1,dim = c(n_isos,max(n_dis)))
 }
   
 stan_model <- stan_model(stan_model_code)
