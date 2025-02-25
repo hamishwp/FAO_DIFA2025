@@ -335,7 +335,8 @@ CleanFAOSTAT <- function(FAOSTAT){
   ###################### ITEM CATEGORIES
   
   ## adding the grouping of 2021 report
-  Cereals = c(44, 89, 101, 108, 94, 103, 56, 79, 75, 92, 27, 71, 83, 97, 15)
+  # Cereals = c(44, 89, 101, 108, 94, 103, 56, 79, 75, 92, 27, 71, 83, 97, 15)
+  Cereals = c(44, 89, 101, 94, 103, 56, 79, 75, 92, 27, 71, 83, 97, 15)
  
   Coffee_tea_cocoa_spice = c(711, 689, 693, 698, 661, 656, 720, 671, 702, 687, 723, 667, 692)
 
@@ -353,12 +354,14 @@ CleanFAOSTAT <- function(FAOSTAT){
                292, 254, 257, 339, 260, 256, 296, 270, 280, 328, 289,
                236, 267, 305, 275)
   
-  Meat = c(949, 1129, 869, 1019, 1037, 979, 1122, 1084, 972, 1137, 944,
-           1094, 1070, 1077, 1032, 1120, 1124, 1161, 1055, 1144, 1154,
-           1012, 1087, 1166, 1108, 1089, 947, 1127, 867, 1058, 1069, 1163,
-           1017, 1073, 1097, 1111, 1158, 1151, 1035, 1151, 977, 1080, 948,
-           1128, 868, 1018, 1098, 1036, 978, 1185, 1176,
-           1806,1808,1807,1141)
+  # Meat = c(949, 1129, 869, 1019, 1037, 979, 1122, 1084, 972, 1137, 944,
+  #          1094, 1070, 1077, 1032, 1120, 1124, 1161, 1055, 1144, 1154,
+  #          1012, 1087, 1166, 1108, 1089, 947, 1127, 867, 1058, 1069, 1163,
+  #          1017, 1073, 1097, 1111, 1158, 1151, 1035, 1151, 977, 1080, 948,
+  #          1128, 868, 1018, 1098, 1036, 978, 1185, 1176,
+  #          1806,1808,1807,1141)
+  Meat = c(1127, 1017, 977, 1806, 1058, 1035, 1080, 1141, 
+           1108, 1069, 1073, 1111, 1158, 1151, 1089)
   
   Milk_honey_eggs = c(1183, 1062, 1067, 1091, 1092, 1182, 951, 1130, 882, 1020, 982, 987)
   
@@ -413,13 +416,31 @@ CleanFAOSTAT <- function(FAOSTAT){
         Item.Code %in% Roots_tuber ~ "Plant_based",
         Item.Code %in% Sugar_crops ~ "Plant_based",
         Item.Code %in% tobacco_fibres_rubber ~ "Plant_based",
-        Item.Code %in% vegetables ~ "Plant_based")
+        Item.Code %in% vegetables ~ "Plant_based"),
+      item_grouping_f = case_when(
+        Item.Code %in% Cereals | Item.Code %in% Sugar_crops ~ "Cereals & sugar crops",
+        Item.Code %in% Fruits_nuts ~ "Fruits & nuts",
+        Item.Code %in% Legumes ~ "Legumes",
+        Item.Code %in% Meat ~ "Meat",
+        Item.Code %in% Roots_tuber ~ "Roots & tubers",
+        Item.Code %in% vegetables ~ "Vegetables")
     )%>%
     filter(
       !is.na(Item.Code) 
     )
   
-  return(list(yield_data = YIELD, MF = MF,Prod = Production,Area = AREA))
+  item_groups<-Production%>%
+    transmute(Item=Item,Item.Code=Item.Code,
+              item_grouping_f = case_when(
+                Item.Code %in% Cereals | Item.Code %in% Sugar_crops ~ "Cereals & sugar crops",
+                Item.Code %in% Fruits_nuts ~ "Fruits & nuts",
+                Item.Code %in% Legumes ~ "Legumes",
+                Item.Code %in% Meat ~ "Meat",
+                Item.Code %in% Roots_tuber ~ "Roots & tubers",
+                Item.Code %in% vegetables ~ "Vegetables"))%>%distinct()%>%
+    filter(!is.na(item_grouping_f))
+  
+  return(list(yield_data = YIELD, MF = MF,Prod = Production,Area = AREA,item_groups=item_groups))
 }
 
 GetModelProduction<-function(syear=1990,fyear=NULL){

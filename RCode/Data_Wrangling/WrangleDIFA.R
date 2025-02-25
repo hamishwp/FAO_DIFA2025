@@ -16,7 +16,7 @@ GetDisaster<-function(syear=1990,fyear=NULL){
 # normalise the population-, GDP- and area-related variables by national totals
 NormaliseImpacts<-function(df,wb){
   # First make sure that any empty values are not normalised
-  wb%<>%mutate_at(c("GDP","population","livestock","surfarea"),
+  wb%<>%mutate_at(c("GDP","population","surfarea"),
                   function(x) {x[x<=0]<-NA; return(x)})
   print(paste0("Number of countries with NAs = ",paste0(sapply(3:ncol(wb),function(i) {paste0(names(wb)[i],"=",length(unique(wb$ISO3[is.na(wb[,i])])))}),collapse=", ")))
   print(paste0("Number of database countries not in wb = ",sum(!unique(df$ISO3)%in%unique(wb$ISO3))," (",paste0(unique(df$ISO3)[!unique(df$ISO3)%in%wb$ISO3],collapse = ","),")"))
@@ -30,8 +30,6 @@ NormaliseImpacts<-function(df,wb){
                norm_cost=cost/GDP)
   # Normalise the area-related impact types, if they exist!
   if(!is.null(df$crops)) df%<>%mutate(norm_crops=crops/surfarea)
-  # Normalise the livestock-related impact types, if they exist!
-  if(!is.null(df$cattle)) df%<>%mutate(norm_cattle=cattle/livestock)
   
   return(df)
 }
@@ -83,20 +81,44 @@ GroupHazs<-function(df,hazgrp=hazgrp){
   df%>%filter(!is.na(haz_grp))
 }
 
-# For the data normalisations, we don't have anything to normalise the Desinventar cattle data to, so calculate it from FAOSTAT
-AddLivestock<-function(wb,faostat){
-  # Generate the livestock data from FAOSTAT production
-  livestock<-faostat$Prod%>%
-    filter(item_grouping_2=="Livestock_products")%>%
-    group_by(ISO3.CODE,Year)%>%
-    reframe(livestock=sum(Production,na.rm = T),Year=as.integer(Year))%>%
-    ungroup()%>%distinct()
-  # Add it!
-  wb%>%left_join(livestock,by=join_by(ISO3==ISO3.CODE,year==Year))
-}
-
 ConvHe2Tonnes<-function(sevvies,faostat){
+  # Extract the country-wise ~10-year average yield per commodity group
+  heprod<-difa$faostat$yield%>%left_join(difa$faostat$item_groups,by=c("Item"))%>%
+    filter(!is.na(item_grouping_f) & Year>2015)%>%
+    group_by(ISO3.CODE,item_grouping_f,Year)%>%
+    reframe(sumyield=sum(Yield,na.rm = T))%>%
+    group_by(ISO3.CODE,item_grouping_f)%>%
+    reframe(avyield=mean(sumyield,na.rm=T))
+  # Calculate the production proportion between different commodity groups, per country
+  avprod<-difa$faostat$Prod%>%dplyr::select(-any_of(c("item_grouping_f")))%>%
+    left_join(difa$faostat$item_groups,by=c("Item"))%>%
+    filter(!is.na(item_grouping_f) & Year>2015)%>%
+    group_by(ISO3.CODE,item_grouping_f,Year)%>%
+    reframe(sumprod=sum(Production,na.rm = T))%>%
+    group_by(ISO3.CODE,item_grouping_f)%>%
+    reframe(avprod=mean(sumprod,na.rm=T))%>%
+    group_by(ISO3.CODE)%>%
+    reframe(item_grouping_f=item_grouping_f,
+            propprod=avprod/sum(avprod))
+  # Merge them
+  heprod%<>%left_join(avprod,by=c("ISO3.CODE","item_grouping_f")); rm(avprod)
+  # Add price per tonne
   
+  
+  
+  
+  pricy<-difa$faostat$price
+  
+  
+  
+  
+  # Based on expected losses in hectares, convert to expected production losses
+  sevvies%>%filter(!is.na(mu) & !is.na(sd) & dep=="crops")%>%dplyr::select(-dep)%>%
+    left_join(heprod,by=join_by(ISO3==ISO3.CODE),
+              relationship = "many-to-many")%>%
+    mutate(mu=log(exp(mu)*propprod*avyield),
+           sd=log(exp(sd)*propprod*avyield))%>%
+    dplyr::select(-any_of(c("avyield","propprod","proportion")))
 }
 
 # Prepare the DIFA data to have it in the correct format for modelling
@@ -128,8 +150,6 @@ getData<-function(syear=1990,fyear=NULL){
   faostat<-GetFAOSTAT_All(syear=syear,fyear=fyear)
   # Get yearly population and GDP data from World Bank to use in normalisations
   wb<-GetWorldBank(syear=syear,fyear=fyear)
-  # Add livestock to the wb data from FAOSTAT
-  wb%<>%AddLivestock(faostat)
   # Add country-region dataset
   isoreg<-GetISOregion()
   
