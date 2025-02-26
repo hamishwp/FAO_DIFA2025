@@ -11,7 +11,7 @@ fyear=2023
 # Do we want to use the Desinventar data to infer disaster severity? If not, use EM-DAT multivariate model
 Desinventar<-T
 # MCMC hyperparameters
-hyppars<-list(chains=6,iter=3000,burnin=1500,adapt=0.95,maxtree=30)
+hyppars<-list(chains=8,iter=3000,burnin=1000,adapt=0.95,maxtree=30)
 # Load the packages & default functions
 source("./RCode/Setup/GetPackages.R")
 source("./RCode/Setup/Functions.R")
@@ -25,7 +25,7 @@ TrainModel<-function(fdf,model){
   # Ensure that Stan runs properly with parallel computation enabled
   rstan::rstan_options(auto_write = TRUE)
   # Compile the stan code
-  stan_model <- stan_model(model)
+  stan_model <- rstan::stan_model(model)
   # MCMC Sampling 
   mcmc_results <- rstan::sampling(
     object = stan_model, 
