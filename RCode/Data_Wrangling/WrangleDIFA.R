@@ -165,14 +165,22 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023){
   faostat$Area%<>%filter(Year>=syear & Year<=fyear & ISO3.CODE %in% unique(sevvies$ISO3))
   faostat$Prod%<>%filter(Year>=syear & Year<=fyear & ISO3.CODE %in% unique(sevvies$ISO3))
   sevvies%<>%filter(year>=syear & year<=fyear & ISO3 %in% unique(faostat$Prod$ISO3.CODE))
+  # Extract country ISO3C codes
+  isos <- unique(sevvies$ISO3)
+  # For each country, make a max-normalisation to ensure that no disaster severity estimate is larger than 50% of the minimum production value across 1991-present
+  for(is in isos){
+    for(cm in unique(sevvies$item_grouping_f)){  
+      normy<-min(faostat$Prod$Production[faostat$Prod$ISO3.CODE==is & faostat$Prod$Production>0], na.rm = T)/
+        max(sevvies$mu[sevvies$ISO3==is], na.rm = T)
+      if(normy>0.5) sevvies$mu[sevvies$ISO3==is]<-sevvies$mu[sevvies$ISO3==is]
+    }
+  }
   # Dimensions declaration
   n_t <- fyear-syear+1L        # Number of years
   n_isos <- length(unique(sevvies$ISO3))      # Number of countries
   n_haz <- length(unique(sevvies$haz_grp))       # Number of hazard types
   n_dis <- 30 # number of disasters per country
   n_com <- length(unique(faostat$item_groups$item_grouping_f))
-  # Extract country ISO3C codes
-  isos <- unique(sevvies$ISO3)
   # Timeline
   time <- seq(1, n_t)
   yrs <- seq(syear,fyear)
@@ -203,6 +211,11 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023){
   y <- array(0, dim = c(n_isos, n_t, n_com)) 
   # Create an array of the number of disasters per country
   n_dis_v<-integer(n_t)
+  
+  
+  stop("Remember that sevvies has iprox per commodity")
+  
+  stop("Modify iprox, mu_dis and sig_dis to have an additional dimension of commodity")
   
   # Prepare the time/year related variables
   sevvies %<>%

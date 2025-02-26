@@ -26,7 +26,7 @@ data {
   // Hazard type of the disaster
   array[n_isos, max(n_dis)] int <lower = 0> htype;
   // Expected value of disaster severity, per disaster
-  array[n_isos, max(n_dis)] real<lower=0> iprox;
+  array[n_isos, max(n_dis), n_com] real<lower=0> iprox;
   // Mean AR1 trend in commodity data, per country
   array[n_isos,n_com] real mu_AR1;
   // Standard deviation in AR1 trend in commodity data, per country
@@ -69,26 +69,29 @@ model {
     // Sample through the EOY values
     for(ttt in 1:n_t){
       // Set the disaster severity to zero at first, as well as the GPR mean function
-      real dsev = 0;
+      vector[n_com] dsev = rep_vector(0,n_com);
       // Save some computation
       vector[n_dis[iso]] flag_vec = to_vector(flag[iso, ttt, 1:n_dis[iso]]);
       // Sum all the contributing disaster components if there are any non-zero values
       if(sum(flag_vec)>0){
-        // Save on computation
-        vector[n_dis[iso]] iprox_vec = exp(to_vector(iprox[iso, 1:n_dis[iso]]));
-        vector[n_dis[iso]] iphs = iprox_vec ./ hsev[htype[iso, 1:n_dis[iso]]];
-        // Calculate the disaster severity
-        dsev = sum(flag_vec.*(
-          iprox_vec.*to_vector(hazdur[iso, ttt, 1:n_dis[iso]])*beta_dur +
-          iprox_vec.*iphs.*(exp(-to_vector(ts[iso,ttt, 1:n_dis[iso]])./iphs)-
-          exp(-to_vector(tf[iso,ttt, 1:n_dis[iso]])./iphs)
-          )));
+        // Loop over commodities
+        for(ic in 1:n_com){
+          // Save on computation
+          vector[n_dis[iso]] iprox_vec = exp(to_vector(iprox[iso, 1:n_dis[iso], ic]));
+          vector[n_dis[iso]] iphs = iprox_vec ./ hsev[htype[iso, 1:n_dis[iso]]];
+          // Calculate the disaster severity
+          dsev[ic] = sum(flag_vec.*(
+            iphs.*to_vector(hazdur[iso, ttt, 1:n_dis[iso]])*beta_dur +
+            iprox_vec.*iphs.*(exp(-to_vector(ts[iso,ttt, 1:n_dis[iso]])./iphs)-
+            exp(-to_vector(tf[iso,ttt, 1:n_dis[iso]])./iphs)
+            )));
+        }
       }
       // Set the GPR mean function
       if (ttt == 1) {
         mu = to_vector(y[iso, ttt, ]);  // No past y available
       } else {
-        mu = beta_dis*dsev*(1 + isev) + to_vector(beta_y1[iso, ]).*to_vector(y[iso, ttt-1, ]); // Auto-Regressive first order (AR1) model
+        mu = beta_dis*dsev.*(1 + isev) + to_vector(beta_y1[iso, ]).*to_vector(y[iso, ttt-1, ]); // Auto-Regressive first order (AR1) model
       }
       // Sample the commodity data!
       to_vector(y[iso, ttt, ]) ~ multi_normal_cholesky(mu, L_K);
