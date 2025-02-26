@@ -49,8 +49,6 @@ parameters {
 model {
   // Priors
   hsev ~ gamma(2,1); // Hazard severity
-  rho ~ gamma(2,2); // GPR length-scale
-  alpha ~ gamma(2,1); // GPR marginal standard-deviation
   beta_dis ~ normal(0,20); // Disaster-severity regression coefficient
   beta_dur ~ gamma(2,1); // Hazard duration coefficient
   isev ~ normal(0,1); // Commodity severity
@@ -58,8 +56,6 @@ model {
   vector[n_com] mu;
   // Per country, sample from the model!
   for(iso in 1:n_isos){
-    // GPR AR1 mean function coefficient - empirical Bayes
-    beta_y1[iso,] ~ normal(to_vector(mu_AR1[iso,]), to_vector(sig_AR1[iso,])); 
     // GPR Covariance matrix
     matrix[n_t, n_t] K = add_diag(gp_exp_quad_cov(time, alpha[iso], rho[iso]),1e-6);
     // Decompose the GPR covariance matrix
@@ -96,7 +92,12 @@ model {
       // Sample the commodity data!
       to_vector(y[iso, ttt, ]) ~ multi_normal_cholesky(mu, L_K);
     }
+    // GPR AR1 mean function coefficient - empirical Bayes
+    beta_y1[iso,] ~ normal(to_vector(mu_AR1[iso,]), to_vector(sig_AR1[iso,])); 
   }
+  // We put these here to ensure the initial values are used
+  rho ~ gamma(2,2); // GPR length-scale
+  alpha ~ gamma(2,1); // GPR marginal standard-deviation
 }
 
 

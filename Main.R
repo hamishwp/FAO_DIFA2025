@@ -26,6 +26,9 @@ TrainModel<-function(fdf,model){
   rstan::rstan_options(auto_write = TRUE)
   # Compile the stan code
   stan_model <- rstan::stan_model(model)
+  # Initialisations
+  inits_f<-InitParams(fdf,rstan::stan_model(model)
+)
   # MCMC Sampling 
   mcmc_results <- rstan::sampling(
     object = stan_model, 
