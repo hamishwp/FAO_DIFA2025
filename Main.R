@@ -63,11 +63,6 @@ mcmc_results<-execDIFA()
 saveRDS(mcmc_results,paste0("./Data/Results/fullresults_",str_split(str_split(stan_model_code,"/")[[1]][4],".stan")[[1]][1],"_",save_str,".RData"))
 
 ###### TODAY ######
-# Renormalise mu in sevvies to ensure that GLOBALLY median(mu+3*sigma) = median(production)
-# Then renormalise such that any particular country has it that, per commodity, 
-#   mu values are capped at median(production) ONLY IF THEY EXCEED IT
-# Renormalise the iprox data so that it never exceeds 50% of commodity production, per commodity
-# (note that iprox per commodity is already split between production values so you either need to max-normalise or median-normalise)
 # Add datasets into stan file to calculate the losses in production in USD via the generated_quantities?
 # Run stan code on magpie
 

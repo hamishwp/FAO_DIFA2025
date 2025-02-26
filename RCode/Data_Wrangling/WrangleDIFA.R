@@ -167,14 +167,10 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023){
   sevvies%<>%filter(year>=syear & year<=fyear & ISO3 %in% unique(faostat$Prod$ISO3.CODE))
   # Extract country ISO3C codes
   isos <- unique(sevvies$ISO3)
-  # For each country, make a max-normalisation to ensure that no disaster severity estimate is larger than 50% of the minimum production value across 1991-present
-  for(is in isos){
-    for(cm in unique(sevvies$item_grouping_f)){  
-      normy<-min(faostat$Prod$Production[faostat$Prod$ISO3.CODE==is & faostat$Prod$Production>0], na.rm = T)/
-        max(sevvies$mu[sevvies$ISO3==is], na.rm = T)
-      if(normy>0.5) sevvies$mu[sevvies$ISO3==is]<-sevvies$mu[sevvies$ISO3==is]
-    }
-  }
+  # Normalise the disaster severity globally to ensure the mu+3*sigma is not larger than the median production
+  # (this implies that it is very unlikely that a disaster will occur that will result in losing more than 50% of the production)
+  scalefac<-median(log(faostat$Prod$Production),na.rm = T)/median(sevvies$mu+sevvies$sd*3,na.rm = T)
+  sevvies$mu<-sevvies$mu*scalefac
   # Dimensions declaration
   n_t <- fyear-syear+1L        # Number of years
   n_isos <- length(unique(sevvies$ISO3))      # Number of countries
@@ -200,23 +196,17 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023){
   # Disaster event_id 
   ev_id <- array(NA, dim = c(n_isos, max(n_dis))) 
   # Disaster severity
-  iprox <- array(0, dim = c(n_isos, max(n_dis))) 
+  iprox <- array(0, dim = c(n_isos, max(n_dis), n_com)) 
   # AR1-related variables
   mu_AR1 <- array(0, dim = c(n_isos, n_com)) 
   sig_AR1 <- array(0, dim = c(n_isos, n_com)) 
   # Disaster severity sampling (replaces iprox)
-  mu_dis <- array(0, dim = c(n_isos, max(n_dis))) 
-  sig_dis <- array(0, dim = c(n_isos, max(n_dis))) 
+  mu_dis <- array(0, dim = c(n_isos, max(n_dis), n_com)) 
+  sig_dis <- array(0, dim = c(n_isos, max(n_dis), n_com)) 
   # Commodity data
   y <- array(0, dim = c(n_isos, n_t, n_com)) 
   # Create an array of the number of disasters per country
   n_dis_v<-integer(n_t)
-  
-  
-  stop("Remember that sevvies has iprox per commodity")
-  
-  stop("Modify iprox, mu_dis and sig_dis to have an additional dimension of commodity")
-  
   # Prepare the time/year related variables
   sevvies %<>%
     mutate(sdate = as.Date(sdate),
@@ -226,18 +216,18 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023){
            s_frac = (yday(sdate) - 1) / 365,        
            e_frac = yday(fdate) / 365,             
            duration_years = as.numeric(fdate - sdate) / 365,  
-           endt = sy + s_frac + duration_years)
+           endt = sy + s_frac + duration_years)%>%
+    arrange(ISO3, sdate)
   # Calculate average disaster severity per hazard then use this to normalise the weighting in the top-n most severe
   weights<-sevvies%>%group_by(haz_grp)%>%reframe(hazweight=1/mean(mu,na.rm=T))%>%
     mutate(hazweight=hazweight/max(hazweight,na.rm=T))
-  # Add unique event_ids
-  sevvies%<>%mutate(event_id=1:n())
   # Reduce the number of disasters so that it is only the top-n most severe
-  disnos<-sevvies%>%left_join(weights,by="haz_grp")%>%
-    group_by(ISO3,event_id)%>%
+  disnos<-sevvies%>%
+    left_join(weights,by="haz_grp")%>%
+    group_by(ISO3,disno)%>%
     reframe(mu=log(sum(exp(mu))),
             hazweight=mean(hazweight),
-            event_id=unique(event_id))%>%
+            disno=unique(disno))%>%
     group_by(ISO3)%>%
     mutate(weights=pmax(mu,0)*hazweight,
            weights=weights/max(weights,na.rm=T))%>%
@@ -245,7 +235,7 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023){
     arrange(desc(weights))%>%
     group_by(ISO3)%>%slice(1:pmin(n_dis,n()))
   # Filter the disaster events
-  redsev<-sevvies%>%filter(event_id%in%disnos$event_id)%>%
+  redsev<-sevvies%>%filter(disno%in%disnos$disno)%>%
     mutate(haz_grp_int=as.integer(as.factor(haz_grp)))
   # Production data from faostat
   prod <- faostat$Prod%>%dplyr::select(-any_of(c("item_grouping_f")))%>%
@@ -266,7 +256,7 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023){
     # Filter only the relevant disaster severity records
     isosev<-redsev%>%filter(ISO3==is)
     # This vector helps speed up the calculations in the stan model
-    n_dis_v[j]<-nrow(isosev)
+    n_dis_v[j]<-length(unique(isosev$disno))
     # Compute AR(1) estimates with pre-filled zeros
     armod <- prod %>% filter(ISO3.CODE == is) %>% group_by(item_grouping_f) %>%
       reframe(AR1 = ifelse(n() > 1, Rfast::ar1(Prod)[["phi"]], 0),  # If only one value, return 0 for AR1
@@ -280,15 +270,30 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023){
     # Store it
     mu_AR1[j,] <- armod[,1]
     sig_AR1[j,] <- armod[,2]
-    # Each disaster, per country
-    ev_id[j,1:n_dis_v[j]] <- isosev$event_id[1:n_dis_v[j]]
-    # Hazard type
-    htype[j,1:n_dis_v[j]]<-isosev$haz_grp_int[1:n_dis_v[j]]
-    # Disaster severity
-    iprox[j,1:n_dis_v[j]] <- isosev$mu[1:n_dis_v[j]]
-    # Disaster severity for the sampling model
-    mu_dis[j,1:n_dis_v[j]] <- isosev$mu[1:n_dis_v[j]]
-    sig_dis[j,1:n_dis_v[j]] <- isosev$sd[1:n_dis_v[j]]
+    for(k in 1:length(commods)){
+      # Which commodity are we referring to?
+      ic<-commods[k]
+      # Filter
+      comsev<-isosev%>%filter(item_grouping_f==ic)
+      # Add the data
+      if(nrow(comsev)==0){
+        # Disaster severity
+        iprox[j,1:n_dis_v[j], k] <- 0
+        # Disaster severity for the sampling model
+        mu_dis[j,1:n_dis_v[j], k] <- 0
+        sig_dis[j,1:n_dis_v[j], k] <- 1e-9
+      } else {
+        # Each disaster, per country
+        ev_id[j,1:n_dis_v[j]] <- comsev$disno[1:n_dis_v[j]]
+        # Hazard type
+        htype[j,1:n_dis_v[j]]<-comsev$haz_grp_int[1:n_dis_v[j]]
+        # Disaster severity
+        iprox[j,1:n_dis_v[j], k] <- comsev$mu[1:n_dis_v[j]]
+        # Disaster severity for the sampling model
+        mu_dis[j,1:n_dis_v[j], k] <- comsev$mu[1:n_dis_v[j]]
+        sig_dis[j,1:n_dis_v[j], k] <- comsev$sd[1:n_dis_v[j]]
+      }
+    }
     # All years in the data
     for(t in time){
       # All-year commodities data
@@ -297,7 +302,7 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023){
   }
   # Create a row index that labels each country's disasters for the matrix
   redsev%<>% 
-    arrange(ISO3, sdate)%>% 
+    distinct(across(-item_grouping_f), .keep_all = TRUE)%>%
     group_by(ISO3)%>% 
     mutate(evvie = 1:n())
   # Now for the awkward disaster variables
