@@ -169,18 +169,32 @@ stan_model <- stan_model(stan_model_code)
 mcmc_results <- sampling(
   object = stan_model, 
   data = data_list, 
-  chains = 8, 
-  iter = 3500, 
+  chains = 6, 
+  iter = 3000, 
   # thin = 4,
   warmup = 1500, 
   seed = 42,
-  control = list(adapt_delta = 0.95, max_treedepth=15),
+  control = list(adapt_delta = 0.95, max_treedepth=30),
   sample_file="./Data/Results/Simulations/DIFA2025_csevOnly.csv"
 )
 print(mcmc_results)
+# Extract tables of the parameter posterior realisations
+mcmc_tab<-extract(mcmc_results)
+# Extract the summary
+mcmc_sum<-summary(mcmc_results)
+# MCMC-related parameters
+sampler_params <- get_sampler_params(mcmc_results, inc_warmup = FALSE)
+# Acceptance rate of the MCMC sampler
+mean_accept_stat_by_chain <- sapply(sampler_params, function(x) mean(x[, "accept_stat__"]))
+print(mean_accept_stat_by_chain)
+# Max tree-depth of the MCMC sampler
+max_treedepth_by_chain <- sapply(sampler_params, function(x) max(x[, "treedepth__"]))
+print(max_treedepth_by_chain)
+# How long it took for the sampler to a) reach the end of the warm up and b) sample-phase of MCMC
+print(get_elapsed_time(mcmc_results))
 
 # Plot MCMC diagnostics
-traceplot(mcmc_results, pars = c("beta_dis", "hsev", "beta_y1"))
+traceplot(mcmc_results, pars = c("beta_dis", "hsev", "csev"))
 
 mcmc_results<-rstan::read_stan_csv(list.files("./Data/Results/Simulations/RedRedDis_Success/",full.names = T))
 
