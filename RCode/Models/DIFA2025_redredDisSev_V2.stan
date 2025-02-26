@@ -53,6 +53,7 @@ model {
  alpha ~ gamma(2,1); // GPR marginal standard-deviation
  beta_dis ~ normal(0,20); // Disaster-severity regression coefficient
  beta_dur ~ gamma(2,1); // Hazard duration coefficient
+ isev ~ normal(0,1); // Commodity severity
  // beta_0 ~ normal(0,5); // GPR time=0 regression bias correction
  // GPR mean function
  vector[n_com] mu = rep_vector(0, n_com);

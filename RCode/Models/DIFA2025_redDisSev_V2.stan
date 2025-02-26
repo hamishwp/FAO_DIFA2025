@@ -51,6 +51,7 @@ model {
  // Priors
  hsev ~ gamma(2,1); // Hazard severity
  csev ~ normal(0,1); // Country severity
+ isev ~ normal(0,1); // Commodity severity
  rho ~ gamma(2,2); // GPR length-scale
  alpha ~ gamma(2,1); // GPR marginal standard-deviation
  beta_dis ~ normal(0,5); // Disaster-severity regression coefficient

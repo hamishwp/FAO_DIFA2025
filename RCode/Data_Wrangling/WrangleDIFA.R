@@ -161,10 +161,10 @@ getData<-function(syear=1990,fyear=NULL){
 # Once disaster severity has been predicted, generate all the data we need 
 Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023){
   # Make sure the data covers the correct range
-  faostat$yield%<>%filter(Year>=syear & Year<=fyear)
-  faostat$Area%<>%filter(Year>=syear & Year<=fyear)
-  faostat$Prod%<>%filter(Year>=syear & Year<=fyear)
-  sevvies%<>%filter(year>=syear & year<=fyear)
+  faostat$yield%<>%filter(Year>=syear & Year<=fyear & ISO3.CODE %in% unique(sevvies$ISO3))
+  faostat$Area%<>%filter(Year>=syear & Year<=fyear & ISO3.CODE %in% unique(sevvies$ISO3))
+  faostat$Prod%<>%filter(Year>=syear & Year<=fyear & ISO3.CODE %in% unique(sevvies$ISO3))
+  sevvies%<>%filter(year>=syear & year<=fyear & ISO3 %in% unique(faostat$Prod$ISO3.CODE))
   # Dimensions declaration
   n_t <- fyear-syear+1L        # Number of years
   n_isos <- length(unique(sevvies$ISO3))      # Number of countries
