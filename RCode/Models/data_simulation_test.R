@@ -24,17 +24,19 @@ y_model <- as.matrix(
 
 rownames(y_model) <- Item_wide$ISO3.CODE
 
+EMDAT <- GET_EMDAT_MODEL()
+
+ts <- EMDAT$ts
+tf <- EMDAT$tf
+hazdur <- EMDAT$hazdur
+flag <- EMDAT$flag
+
 # ----- Define Data Dimensions -----
 n_t <- length(unique(Item$Year)) # Number of years
 n_isos <- length(unique(Item$ISO3.CODE)) # Number of countries
-n_haz <- 3       # Number of hazard types
-
-# Each country has a random number of disasters (between 1 and 5)
+n_haz <- 4   # Number of hazard types
 n_dis <- sample(1:25, n_isos, replace = TRUE) 
-
-# Time series (assumed to be evenly spaced years)
 time <- seq(1, n_t)
-
 # ----- Define Parameters -----
 # Gaussian Process Covariance Parameters
 rho <- rgamma(n_isos, shape = 2, scale = 2)   # Length-scale
@@ -50,61 +52,6 @@ hsev <- (1:n_haz)^2 # rgamma(n_haz, shape = 2, scale = 1)  # Hazard severity by 
 csev <- rep(0.,n_isos)#rnorm(n_isos, mean = 0, sd = 0.5)      # Country severity
 beta_dis <- -0.000001 # Disaster-severity regression coefficient
 beta_dur <- 0.0001 # Hazard duration contribution to disaster severity
-
-# ----- Generate Disaster Information -----
-# Hazard types per disaster 
-htype <- array(0, dim = c(n_isos, max(n_dis))) 
-# Disaster occurrence flag
-flag <- array(0, dim = c(n_isos, n_t, max(n_dis))) 
-# Hazard duration per year
-hazdur <- array(0, dim = c(n_isos, n_t, max(n_dis))) 
-# Disaster duration per year
-tdecay <- array(0, dim = c(n_isos, n_t, max(n_dis))) 
-# Disaster severity
-iprox <- array(0, dim = c(n_isos, max(n_dis))) 
-
-# Generate disasters for each country
-for (iso in 1:n_isos) {
-  # Which year did the disaster occur?
-  dis_years <- sample(1:n_t, n_dis[iso], replace = TRUE)  # Ensure enough space for multi-year disasters
-  # Which hazard type was the disaster (nominal data)
-  htype[iso,] <- sample(1:n_haz, max(n_dis), replace = TRUE)
-  # Generate the disaster severity
-  iprox[iso, ] <- rgamma(max(n_dis), shape = 1, scale = 1)  # Random disaster severity
-  # Estimate how long each disaster has an impact on the countries production
-  for (i in 1:n_dis[iso]) {
-    start_year <- dis_years[i]
-    duration_years <- rgamma(1,0.3,1)*htype[iso,i]  # Ensure enough space for multi-year disasters
-    startprop <- runif(1,0,1) # At which proportion of the year did the disaster occur?
-    end_year <- min(floor(start_year + duration_years), n_t)  # Ensure disaster doesn't exceed time range
-    # Set the flag for the disaster impact on EOY values
-    flag[iso, start_year:n_t, i] <- 1  # Mark disaster occurrence
-    # Calculate the hazard and disaster duration arrays
-    for (t in start_year:n_t) {
-      if (t == start_year) {
-        if(1-startprop>=duration_years){ # hazard lasts less than one year
-          hazdur[iso, start_year, i] <- duration_years
-          tdecay[iso, t, i] <- t-startprop-duration_years
-        } else { # hazard lasts more than in the initial year
-          hazdur[iso, start_year, i] <- 1-startprop
-          tdecay[iso, t, i] <- t
-        }
-      } else if (t < end_year){        
-        # Intermediate years: Hazard is active for the full year, no additional duration needed
-        hazdur[iso, t, i] <- 1
-        tdecay[iso, t, i] <- t  # Nothing left over in intermediate years
-      } else if (t == end_year){
-        # Final year: Hazard ends sometime in the year
-        remaining_hazard <- duration_years - sum(hazdur[iso, start_year:(t-1), i])
-        hazdur[iso, t, i] <- min(remaining_hazard, 1)  # Ensure it doesn't exceed a full year
-        tdecay[iso, t, i] <- t - hazdur[iso, t, i]  # Remaining portion of the year
-      } else {
-        hazdur[iso, t, i] <- 0
-        tdecay[iso, t, i] <- t-1  # Full year duration for intermediate years
-      }
-    }
-  }
-}
 
 # ----- Generate GP for Each Country -----
 y <- array(0, dim = c(n_isos, n_t))  # Commodity data (final output)

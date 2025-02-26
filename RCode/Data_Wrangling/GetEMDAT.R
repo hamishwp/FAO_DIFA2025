@@ -401,6 +401,7 @@ GET_EMDAT_MODEL <- function(emdat=NULL){
   
   return(list(ts = ts,
               tf =  tf,
-              hazdur = hazdur)
+              hazdur = hazdur,
+              flag = flag)
   )
 }
