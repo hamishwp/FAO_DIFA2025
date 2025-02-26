@@ -160,6 +160,11 @@ getData<-function(syear=1990,fyear=NULL){
 
 # Once disaster severity has been predicted, generate all the data we need 
 Prepare4Model<-function(difa,sevvies,syear=1991,fyear=NULL){
+  # Make sure the data covers the correct range
+  difa$faostat$yield%<>%filter(Year>=syear & Year<=fyear)
+  difa$faostat$Area%<>%filter(Year>=syear & Year<=fyear)
+  difa$faostat$Prod%<>%filter(Year>=syear & Year<=fyear)
+  sevvies%<>%filter(year>=syear & year<=fyear)
   # Dimensions declaration
   n_t <- fyear-syear+1L        # Number of years
   n_isos <- length(unique(sevvies$ISO3))      # Number of countries
@@ -169,6 +174,7 @@ Prepare4Model<-function(difa,sevvies,syear=1991,fyear=NULL){
   isos <- unique(sevvies$ISO3)
   # Timeline
   time <- seq(1, n_t)
+  yrs <- seq(syear,fyear)
   # Hazard types per disaster 
   htype <- array(NA, dim = c(n_isos, max(n_dis))) 
   # Disaster occurrence flag
@@ -222,36 +228,61 @@ Prepare4Model<-function(difa,sevvies,syear=1991,fyear=NULL){
   stop("are we wasting precious calculation & memory by having disaster dimension as n_dis rather than maybe limiting max number of disasters per year instead")
   
   
-  
-  
-  
+  # Create an array of the number of disasters per country
+  n_dis_v<-integer(n_t)
+  # Production data from faostat
+  prod <- difa$faostat$Prod%>%dplyr::select(-any_of(c("item_grouping_f")))%>%
+    left_join(difa$faostat$item_groups,by=c("Item"))%>%
+    filter(!is.na(item_grouping_f) & Year>=syear & Year<=fyear)%>%
+    group_by(ISO3.CODE,item_grouping_f,Year)%>%
+    reframe(Prod=sum(Production,na.rm = T))%>%mutate(Year=as.integer(Year))
+  # Which commodities are we covering?
+  commods<-sort(unique(prod$item_grouping_f))
   
   # Iterate over all countries
   for(is in unique(redsev$ISO3)){
+    # Filter only the relevant disaster severity records
+    isosev<-redsev%>%filter(ISO3==is)
+    # This vector helps speed up the calculations in the stan model
+    n_dis_v[is]<-nrow(isosev)
+    # Calculate a very simply AR model whereby 
+    tmp<-prod%>%filter(ISO3.CODE==is)%>%group_by(item_grouping_f)%>%
+      reframe(AR1=Rfast::ar1(tmp$Prod))
+      reframe(diffy=diff(Prod)/Prod[2:n()])%>%pull(diffy)
+    # Auto-regressive model
+    armod<-Rfast::ar1(tmp$Prod)
+    mu_AR1[is] <- armod[["phi"]]
+    sig_AR1[is] <- sqrt(armod[["sigma"]])
     
     
     
     
-    mu_AR1[is] <- mu_AR1
-    sig_AR1[is] <- sig_AR1
-    
-    
-    
-    
-    
+    # Each disaster, per country
+    for(ev in 1:n_dis_v[is]){
+      # Hazard type
+      stop("what is this????")
+      htype[is,ev]<-isosev$haz_grp_int[ev]
+      # Disaster severity
+      iprox[is,ev] <- isosev$mu[ev]
+      mu_dis[is,ev] <- isosev$mu[ev]
+      sig_dis[is,ev] <- isosev$sd[ev]
+    }
     # All years in the data
     for(t in time){
       # Filter only the relevant disaster severity records
-      minisev<-redsev%>%filter(ISO3==is & year==(t+syear-1))
-      # This vector helps speed up the calculations in the stan model
-      n_dis_v[is]<-nrow(minisev)
+      minisev<-isosev%>%filter(year==(t+syear-1))
+      
       # 
       
       
       
-      
-      y <- y
-      
+      # All years commodities in the data
+      for(cm in 1:length(commods)){
+        y[is,cm,t] <- prod%>%
+          filter(ISO3.CODE==is &
+                   item_grouping_f==commods[cm] &
+                   Year==yrs[t])%>%pull(Prod)
+      }
       
       
       

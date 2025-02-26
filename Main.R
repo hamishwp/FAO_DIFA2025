@@ -33,3 +33,13 @@ execDIFA<-function(){
               fdf=fdf,
               mGPR=mGPR))
 }
+
+
+
+###### TODAY ######
+# Add an item-type parameter into stan dsev variable, like csev, named isev
+# Remove csev
+# Modify Stan to accept all commodities and not just crops or cattle
+# Add datasets into stan file to calculate the losses in production in USD via the generated_quantities?
+# Run stan code on magpie
+

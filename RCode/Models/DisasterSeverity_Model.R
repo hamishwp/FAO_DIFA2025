@@ -400,12 +400,4 @@ if(Desinventar){ # infer disaster severity from Desinventar data
 
 
 
-###### TODAY ######
-# Add an item-type parameter into stan dsev variable, like csev
-# Select only top-20 events per hazard group, per country
-# Modify Stan to accept all commodities and not just crops or cattle
-# Add datasets into stan file to calculate the losses in production in USD via the generated_quantities?
-# Run stan code on magpie
-
-
 
