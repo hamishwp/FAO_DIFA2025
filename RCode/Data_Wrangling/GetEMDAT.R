@@ -303,9 +303,6 @@ GET_EMDAT_MODEL <- function(emdat=NULL){
   # Extract the data if it is not provided
   if(is.null(emdat)) emdat <- API_EMDAT()
   
-  emdat$sdate <- as.Date(emdat$sdate)
-  emdat$fdate <- as.Date(emdat$fdate)
-  
   emdat <- emdat %>%
     mutate(
       sdate = as.Date(sdate),

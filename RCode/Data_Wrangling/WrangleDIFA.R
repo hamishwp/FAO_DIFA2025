@@ -158,5 +158,203 @@ getData<-function(syear=1990,fyear=NULL){
     PrepDIFA()
 }
 
-
+# Once disaster severity has been predicted, generate all the data we need 
+Prepare4Model<-function(difa,sevvies,syear=1991,fyear=NULL){
+  # Dimensions declaration
+  n_t <- fyear-syear+1L        # Number of years
+  n_isos <- length(unique(sevvies$ISO3))      # Number of countries
+  n_haz <- length(unique(sevvies$haz_grp))       # Number of hazard types
+  n_dis <- 50 # number of disasters per country
+  # Extract country ISO3C codes
+  isos <- unique(sevvies$ISO3)
+  # Timeline
+  time <- seq(1, n_t)
+  # Hazard types per disaster 
+  htype <- array(NA, dim = c(n_isos, max(n_dis))) 
+  # Disaster occurrence flag
+  flag <- array(0, dim = c(n_isos, n_t, max(n_dis))) 
+  # Hazard duration per year
+  hazdur <- array(0, dim = c(n_isos, n_t, max(n_dis))) 
+  # Disaster duration start to end window per year
+  ts <- array(NA, dim = c(n_isos, n_t, max(n_dis))) 
+  tf <- array(NA, dim = c(n_isos, n_t, max(n_dis))) 
+  # Disaster severity
+  iprox <- array(0, dim = c(n_isos, max(n_dis))) 
+  
+  stop("Make sure to define the vector n_dis")
+  
+  
+  # Prepare the time/year related variables
+  sevvies %<>%
+    mutate(sdate = as.Date(sdate),
+           fdate = as.Date(fdate),
+           sy = year(sdate),                     
+           ey = year(fdate),                   
+           s_frac = (yday(sdate) - 1) / 365,        
+           e_frac = yday(fdate) / 365,             
+           duration_years = as.numeric(fdate - sdate) / 365,  
+           endt = sy + s_frac + duration_years)
+  # Calculate average disaster severity per hazard then use this to normalise the weighting in the top-n most severe
+  weights<-sevvies%>%group_by(haz_grp)%>%reframe(hazweight=1/mean(mu,na.rm=T))%>%
+    mutate(hazweight=hazweight/max(hazweight,na.rm=T))
+  # Add unique event_ids
+  sevvies%<>%mutate(event_id=1:n())
+  # Reduce the number of disasters so that it is only the top-n most severe
+  disnos<-sevvies%>%left_join(weights,by="haz_grp")%>%
+    group_by(ISO3,event_id)%>%
+    reframe(mu=log(sum(exp(mu))),
+            hazweight=mean(hazweight),
+            event_id=unique(event_id))%>%
+    group_by(ISO3)%>%
+    mutate(weights=pmax(mu,0)*hazweight,
+           weights=weights/max(weights,na.rm=T))%>%
+    ungroup()%>%mutate(weights=case_when(is.infinite(weights)~1,T~weights))%>%
+    arrange(desc(weights))%>%
+    group_by(ISO3)%>%slice(1:pmin(n_dis,n()))
+  # Filter the disaster events
+  redsev<-sevvies%>%filter(event_id%in%disnos$event_id)%>%
+    mutate(haz_grp_int=as.integer(as.factor(haz_grp)))
+  
+  
+  
+  
+  
+  stop("are we wasting precious calculation & memory by having disaster dimension as n_dis rather than maybe limiting max number of disasters per year instead")
+  
+  
+  
+  
+  
+  
+  # Iterate over all countries
+  for(is in unique(redsev$ISO3)){
+    
+    
+    
+    
+    mu_AR1[is] <- mu_AR1
+    sig_AR1[is] <- sig_AR1
+    
+    
+    
+    
+    
+    # All years in the data
+    for(t in time){
+      # Filter only the relevant disaster severity records
+      minisev<-redsev%>%filter(ISO3==is & year==(t+syear-1))
+      # This vector helps speed up the calculations in the stan model
+      n_dis_v[is]<-nrow(minisev)
+      # 
+      
+      
+      
+      
+      y <- y
+      
+      
+      
+      
+      
+      # Each disaster, per country per year
+      for(ev in 1:n_dis_v[is]){
+        # Hazard type
+        htype[is,ev]<-minisev$haz_grp_int[ev]
+        # Disaster severity
+        iprox[is,ev] <- minisev$mu[ev]
+        mu_dis[is,ev] <- minisev$mu[ev]
+        sig_dis[is,ev] <- minisev$sd[ev]
+        # Hazard duration
+        stop("This isn't right:")
+        hazdur[is,t,ev] <- minisev$duration[ev]
+        
+        flag = flag
+        ts = ts
+        tf = tf
+        
+        
+        
+        
+      }
+    }
+  }
+  
+  
+  
+  
+  
+  return(list(n_t = n_t,
+              n_isos = n_isos,
+              n_dis = n_dis,
+              n_haz = n_haz,
+              time = time,
+              y = y,  
+              flag = flag,
+              ts = ts,
+              tf = tf,
+              hazdur = hazdur,
+              htype = htype,
+              iprox = log(iprox),
+              mu_AR1 = mu_AR1,
+              sig_AR1 = sig_AR1,
+              mu_dis=mu_dis,
+              sig_dis=sig_dis))
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  for(i in 1:nrow(redsev)){
+    iso <- redsev$ISO3[i]
+    event <- redsev$event_id[i]
+    sy <- redsev$sy[i]      
+    ey <- redsev$ey[i]      
+    sfrac <- redsev$s_frac[i]
+    efrac <- redsev$e_frac[i]
+    duration_years <- redsev$duration_years[i]
+    endt <- redsev$endt[i]
+    
+    for(t in as.numeric(sy):as.numeric(max(years_all))){
+      t_chr <- as.character(t)
+      flag[iso, t_chr, event] <- 1
+    }
+    
+    for(t in as.numeric(sy):as.numeric(max(years_all))){
+      t_chr <- as.character(t)
+      
+      if(t == sy){ 
+        if((1 - sfrac) >= duration_years){
+          ts[iso, t_chr, event] <- 0
+          tf[iso, t_chr, event] <- 1 - sfrac - duration_years
+        } else { 
+          ts[iso, t_chr, event] <- 1
+          tf[iso, t_chr, event] <- 1
+        }
+        
+        hazdur[iso, t_chr, event] <- duration_years
+        
+      } else if(t < endt){      
+        ts[iso, t_chr, event] <- 1
+        tf[iso, t_chr, event] <- 1
+        
+      } else if(t > endt & t < (endt + 1)){
+        ts[iso, t_chr, event] <- 0
+        tf[iso, t_chr, event] <- t - endt
+      } else {
+        ts[iso, t_chr, event] <- t - 1 - endt
+        tf[iso, t_chr, event] <- t - endt
+      }
+    }
+  }
+  
+  return(list(ts = ts,
+              tf =  tf,
+              hazdur = hazdur))
+  
+}
 

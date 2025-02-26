@@ -388,7 +388,7 @@ if(Desinventar){ # infer disaster severity from Desinventar data
       theme_bw();p
     ggsave("EMDAT_DisSev_Proportion_Corrplot.png",p,path="./Plots",width=7,height=5)
     
-    return(sevvies)
+    sevvies%>%filter(!is.infinite(mu) & !is.infinite(sd) & !is.na(mu) & !is.na(sd))
   }
 } else { # infer disaster severity from EM-DAT impact types directly
   stop("EM-DAT-based disaster severity model not ready yet")
@@ -401,7 +401,6 @@ if(Desinventar){ # infer disaster severity from Desinventar data
 
 
 ###### TODAY ######
-# CONVERT FROM HECTARES TO TONNES
 # Add an item-type parameter into stan dsev variable, like csev
 # Select only top-20 events per hazard group, per country
 # Modify Stan to accept all commodities and not just crops or cattle

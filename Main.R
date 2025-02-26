@@ -11,8 +11,9 @@ Desinventar<-T
 source("./RCode/Setup/GetPackages.R")
 source("./RCode/Setup/Functions.R")
 # Start and end year of analysis
-syear=1990
+syear=1991
 fyear=AsYear(Sys.Date())
+fyear=2023
 # Which STAN model to use?
 stan_model_code <- "./RCode/Models/DIFA2025.stan" 
   
@@ -22,9 +23,9 @@ execDIFA<-function(){
   difa<-getData(syear=syear,fyear=fyear)
   # Train the disaster severity model and predict on EM-DAT+UCDP data
   sevvies<-GetDisSev(difa$dissie$dessie,difa$dissie$emdat)%>%
-    convHe2Tonnes(difa$faostat)
+    ConvHe2Tonnes(difa$faostat)
   # Prepare the data to be input into the stan model
-  fdf<-Prepare4Model(difa,sevvies)
+  fdf<-Prepare4Model(difa,sevvies,fyear=fyear,syear=syear)
   # Train the model
   mGPR<-TrainModel(df=fdf,model=stan_model_code)
   
