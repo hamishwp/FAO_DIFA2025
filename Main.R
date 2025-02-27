@@ -16,7 +16,7 @@ hyppars<-list(chains=8,iter=3000,burnin=1000,adapt=0.95,maxtree=30)
 source("./RCode/Setup/GetPackages.R")
 source("./RCode/Setup/Functions.R")
 # Which STAN model to use?
-stan_model_code <- "./RCode/Models/DIFA2025_redredDisSev_V2.stan" 
+stan_model_code <- "./RCode/Models/DIFA2025_redredDisSev_noGPR_V2.stan" 
 # Save all files with this time-dependent extension
 save_str<-str_replace_all(str_replace_all(Sys.time()," ","_"),":","")
 
@@ -66,6 +66,10 @@ mcmc_results<-execDIFA()
 saveRDS(mcmc_results,paste0("./Data/Results/fullresults_",str_split(str_split(stan_model_code,"/")[[1]][4],".stan")[[1]][1],"_",save_str,".RData"))
 
 ###### TODAY ######
-# Add datasets into stan file to calculate the losses in production in USD via the generated_quantities?
+# Remove GPR and add random noise - sig_AR1
+# Normalise values by max(y)?
+# Initial values... are you happy with them yet?
+# Run noGPR models
 # Run stan code on magpie
-
+# Model the price data using : y ~ (1 + time | ISO3) + (1 + time | haz_grp)
+# Add datasets into stan file to calculate the losses in production in USD via the generated_quantities?

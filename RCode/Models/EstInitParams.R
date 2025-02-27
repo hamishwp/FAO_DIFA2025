@@ -39,7 +39,7 @@ InitParams<-function(fdf, iprox_dat=T){
   # Fit GPR per country per commodity
   for (iso in 1:fdf$n_isos) {
     # Convert fdf$y (array) into a tidy data frame
-    y <- as.data.frame.table(fdf$y[iso,,]/max(fdf$y)) %>%
+    y <- as.data.frame.table(fdf$y[iso,,]) %>%
       rename(time_index = Var1, commodity_index = Var2, y_value = Freq) %>%
       mutate(time = fdf$time[as.numeric(time_index)],  # Map correct time values
              commodity_index = as.numeric(commodity_index))%>%  # Convert to numeric if needed
