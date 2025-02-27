@@ -29,6 +29,7 @@ GetSourceFiles<-function(){
   source(paste0(directory,'RCode/Data_Wrangling/WrangleDIFA.R'))
   # Models required
   source(paste0(directory,'RCode/Models/DisasterSeverity_Model.R'))
+  source(paste0(directory,'RCode/Models/EstInitParams.R'))
   
   return(T)
 }
@@ -73,7 +74,7 @@ GetPackages<-function(packred=T){
                         "RColorBrewer", "reshape2","countrycode", 'doParallel', 'abind',
                         'openxlsx',"plotly","openxlsx","pracma","ghql","jsonlite","kableExtra",
                         "rworldmap","rworldxtra","data.table","FAOSTAT","readxl",
-                        "combinat","lme4","merTools","caret","DiceKriging")
+                        "combinat","lme4","merTools","caret") #,"DiceKriging")
   
   new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
   if(length(new.packages)>0) install.packages(new.packages, repos='http://cran.us.r-project.org')
