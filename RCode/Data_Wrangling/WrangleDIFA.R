@@ -165,10 +165,9 @@ Check4Stan<-function(fdf){
   if(sum(nannies)>0 & any(!names(fdf)[nannies]%in%c("ev_id"))) warning(paste0("Stan data input check: NA values found in ",names(fdf)[nannies]))
   inds<-which(names(fdf)%in%c("n_t","n_isos","n_haz","n_com"))
   ck<-unlist(fdf[inds])
-  if(any(ck)<=0) stop(paste0("Stan data input check: zero dimensionality found one of : ",paste0(c("n_t","n_isos","n_haz","n_com"),collapse = ", ")))
+  if(any(ck<=0)) stop(paste0("Stan data input check: zero dimensionality found one of : ",paste0(c("n_t","n_isos","n_haz","n_com"),collapse = ", ")))
   if(fdf$n_t!=length(fdf$time)) stop("Stan data input check: time dimensionality or time variable incorrectly created")
   if(fdf$n_isos!=dim(fdf$y)[1]) stop("Stan data input check: ISO dimensionality or ISO column incorrectly created")
-  if(fdf$n_haz!=length(unique(fdf$htype))) stop("Stan data input check: hazard dimensionality or hazard type vector incorrectly created")
   if(fdf$n_com!=dim(fdf$y)[3]) stop("Stan data input check: commodity dimensionality or commodity column incorrectly created")
   if(any(is.na(fdf$n_dis)) | any(fdf$n_dis<0)) stop("Stan data input check: disaster dimensionality incorrectly created")
   if(!all(nchar(fdf$isos)==3)) stop("Stan data input check: ISO3 codes which are not compatible (not ISO3C-codes)")
@@ -226,9 +225,8 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023){
   faostat$yield%<>%filter(Year>=syear & Year<=fyear)
   faostat$Area%<>%filter(Year>=syear & Year<=fyear)
   faostat$Prod%<>%filter(Year>=syear & Year<=fyear)
-  sevvies%<>%filter(year>=syear & year<=fyear & ISO3 %in% unique(faostat$Prod$ISO3.CODE))%>%
-    mutate(mu=case_when(is.na(mu) | is.na(sd) | is.infinite(mu) | is.infinite(sd) ~ 0, T ~ mu),
-           sd=case_when(is.na(mu) | is.na(sd) | is.infinite(mu) | is.infinite(sd) ~ 1e-6, T ~ sd))
+  sevvies%<>%filter(year>=syear & year<=fyear & ISO3 %in% unique(faostat$Prod$ISO3.CODE) &
+                      !(is.na(mu) | is.na(sd) | is.infinite(mu) | is.infinite(sd)))
   # Normalise the disaster severity globally to ensure the mu+3*sigma is not larger than the median production
   # (this implies that it is very unlikely that a disaster will occur that will result in losing more than 50% of the production)
   scalefac<-median(log(faostat$Prod$Production),na.rm = T)/median(sevvies$mu+sevvies$sd*3,na.rm = T)
@@ -241,8 +239,11 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023){
            ey = year(fdate),                   
            s_frac = (yday(sdate) - 1) / 365,        
            e_frac = yday(fdate) / 365,             
-           duration_years = as.numeric(fdate - sdate) / 365,  
-           endt = sy + s_frac + duration_years)%>%
+           duration_years = as.numeric(fdate - sdate) / 365)%>%
+    mutate(duration_years=case_when(duration_years<0 ~ 1e-6, T ~ duration_years),
+           endt = sy + s_frac + duration_years,
+           ey=case_when(efrac>1 ~ floor(endt), T ~ ey),
+           efrac=case_when(efrac>1 ~ 0.999, T ~ efrac))%>%
     arrange(ISO3, sdate)
   # Calculate average disaster severity per hazard then use this to normalise the weighting in the top-n most severe
   weights<-sevvies%>%group_by(haz_grp)%>%reframe(hazweight=1/mean(mu,na.rm=T))%>%
