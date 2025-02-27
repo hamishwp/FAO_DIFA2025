@@ -27,15 +27,14 @@ TrainModel<-function(fdf,model){
   # Compile the stan code
   stan_model <- rstan::stan_model(model)
   # Initialisations
-  inits_f<-InitParams(fdf,rstan::stan_model(model)
-)
+  inits_f<-InitParams(fdf,iprox_dat = grepl("redDisSev",model),GPR = !grepl("noGPR",model))
   # MCMC Sampling 
   mcmc_results <- rstan::sampling(
     object = stan_model, 
     data = fdf, 
     chains = hyppars$chains, 
     iter = hyppars$iter, 
-    # thin = 4,
+    init = inits_f,
     warmup = hyppars$burnin, 
     seed = 42,
     control = list(adapt_delta = hyppars$adapt, max_treedepth=hyppars$maxtree),
@@ -66,8 +65,6 @@ mcmc_results<-execDIFA()
 saveRDS(mcmc_results,paste0("./Data/Results/fullresults_",str_split(str_split(stan_model_code,"/")[[1]][4],".stan")[[1]][1],"_",save_str,".RData"))
 
 ###### TODAY ######
-# Remove GPR and add random noise - sig_AR1
-# Normalise values by max(y)?
 # Initial values... are you happy with them yet?
 # Run noGPR models
 # Run stan code on magpie

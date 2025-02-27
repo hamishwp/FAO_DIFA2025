@@ -32,7 +32,19 @@ estimate_gp_params <- function(y_data, time_points, priors=T) {
   # ))
 }
 
-InitParams<-function(fdf, iprox_dat=T){
+InitParams<-function(fdf, iprox_dat=T, GPR=F){
+  if(!GPR) {
+    if(iprox_dat){
+      return(function(chainnum){
+        list(iprox = fdf$mu_dis,
+             beta_y1 = fdf$mu_AR1)
+      })
+    } else {
+      return(function(chainnum){
+        list(beta_y1 = fdf$mu_AR1)
+      })
+    }
+  }
   # Storage for estimated parameters
   alpha_est <- rep(NA,fdf$n_isos)
   rho_est <- rep(NA,fdf$n_isos)
