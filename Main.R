@@ -18,7 +18,7 @@ source("./RCode/Setup/Functions.R")
 # Which STAN model to use?
 stan_model_code <- "./RCode/Models/DIFA2025_redredDisSev_noGPR_V2.stan" 
 # Save all files with this time-dependent extension
-save_str<-str_replace_all(str_replace_all(Sys.time()," ","_"),":","")
+save_str<-paste0("_",str_replace_all(str_replace_all(Sys.time()," ","_"),":",""))
 
 # Run the stan model
 TrainModel<-function(fdf,model){
@@ -38,7 +38,7 @@ TrainModel<-function(fdf,model){
     warmup = hyppars$burnin, 
     seed = 42,
     control = list(adapt_delta = hyppars$adapt, max_treedepth=hyppars$maxtree),
-    sample_file=paste0("./Data/Results/",str_split(str_split(model,"/")[[1]][4],".stan")[[1]][1],"_",save_str,".csv")
+    sample_file=paste0("./Data/Results/",str_split(str_split(model,"/")[[1]][4],".stan")[[1]][1],save_str,".csv")
   )
 }
 
@@ -62,7 +62,7 @@ execDIFA<-function(presave=T){
 }
 
 mcmc_results<-execDIFA()
-saveRDS(mcmc_results,paste0("./Data/Results/fullresults_",str_split(str_split(stan_model_code,"/")[[1]][4],".stan")[[1]][1],"_",save_str,".RData"))
+saveRDS(mcmc_results,paste0("./Data/Results/fullresults_",str_split(str_split(stan_model_code,"/")[[1]][4],".stan")[[1]][1],save_str,".RData"))
 
 ###### TODAY ######
 # Initial values... are you happy with them yet?

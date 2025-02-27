@@ -8,7 +8,7 @@ data {
   // Data dimensions
   int<lower=1> n_t; // Number of years
   int<lower=1> n_isos; // Number of countries
-  array[n_isos] int<lower=1> n_dis; // Number of disasters, per country
+  array[n_isos] int<lower=0> n_dis; // Number of disasters, per country
   int<lower=1> n_haz; // Number of hazard types
   int<lower=1> n_com; // Number of commodities
   // Time series data - EOY

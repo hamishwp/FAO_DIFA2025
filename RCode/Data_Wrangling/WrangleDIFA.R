@@ -158,17 +158,77 @@ getData<-function(syear=1990,fyear=NULL){
     PrepDIFA()
 }
 
+# Check through the values to be input to stan
+Check4Stan<-function(fdf){
+  # Which elements have NAs?
+  nannies<-unlist(lapply(seq_along(fdf),function(i) any(is.na(fdf[[i]]))))
+  if(sum(nannies)>0 & any(!names(fdf)[nannies]%in%c("ev_id"))) warning(paste0("Stan data input check: NA values found in ",names(fdf)[nannies]))
+  inds<-which(names(fdf)%in%c("n_t","n_isos","n_haz","n_com"))
+  ck<-unlist(fdf[inds])
+  if(any(ck)<=0) stop(paste0("Stan data input check: zero dimensionality found one of : ",paste0(c("n_t","n_isos","n_haz","n_com"),collapse = ", ")))
+  if(fdf$n_t!=length(fdf$time)) stop("Stan data input check: time dimensionality or time variable incorrectly created")
+  if(fdf$n_isos!=dim(fdf$y)[1]) stop("Stan data input check: ISO dimensionality or ISO column incorrectly created")
+  if(fdf$n_haz!=length(unique(fdf$htype))) stop("Stan data input check: hazard dimensionality or hazard type vector incorrectly created")
+  if(fdf$n_com!=dim(fdf$y)[3]) stop("Stan data input check: commodity dimensionality or commodity column incorrectly created")
+  if(any(is.na(fdf$n_dis)) | any(fdf$n_dis<0)) stop("Stan data input check: disaster dimensionality incorrectly created")
+  if(!all(nchar(fdf$isos)==3)) stop("Stan data input check: ISO3 codes which are not compatible (not ISO3C-codes)")
+  if(any(fdf$y<0)) stop("Stan data input check: negative commodity data")
+  if(any(!fdf$flag%in%c(0,1)))  {
+    warning("Stan data input check: flag array not in binary format, check values")
+    fdf$flag[!fdf$flag%in%c(0,1)]<-0
+  }
+  if(any(fdf$ts<0)){
+    warning("Stan data input check: negative ts values")
+    fdf$ts[fdf$ts<0]<-0
+  }  
+  if(any(fdf$tf<0)){
+    warning("Stan data input check: negative tf values")
+    fdf$tf[fdf$tf<0]<-0
+  }  
+  if(any(fdf$hazdur<0)){
+    warning("Stan data input check: negative hazard duration (hazdur) values")
+    fdf$hazdur[fdf$hazdur<0]<-0
+  }
+  if(any(!fdf$htype%in%0:fdf$n_haz)){
+    warning("CORRECTING! Stan data input check: incorrect labelling of hazard types")
+    fdf$htype[!fdf$htype%in%0:fdf$n_haz]<-0
+  }
+  if(any(fdf$iprox<0)){
+    warning("CORRECTING! Stan data input check: negative iprox values, setting to zero")
+    fdf$iprox[fdf$iprox<0]<-0
+  }
+  if(any(fdf$mu_dis<0)){
+    warning("CORRECTING! Stan data input check: negative mu_dis values, setting to zero")
+    fdf$mu_dis[fdf$mu_dis<0]<-0
+  }
+  if(any(fdf$sig_dis<0)){
+    warning("CORRECTING! Stan data input check: negative sig_dis values, setting to 1e-6")
+    fdf$sig_dis[fdf$sig_dis<0]<-1e-6
+  }
+  if(any(fdf$mu_AR1<0)){
+    warning("CORRECTING! Stan data input check: negative mu_AR1 values, setting to zero")
+    fdf$mu_AR1[fdf$mu_AR1<0]<-0
+  }
+  if(any(fdf$sig_AR1<0)){
+    warning("CORRECTING! Stan data input check: negative sig_AR1 values, setting to 1e-6")
+    fdf$sig_AR1[fdf$sig_AR1<0]<-1e-6
+  }
+  return(fdf)
+}
+
 # Once disaster severity has been predicted, generate all the data we need 
 Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023){
+  # Some dimensions
+  n_t <- fyear-syear+1L        # Number of years
+  n_dis <- 30 # number of disasters per country
+  n_com <- length(unique(faostat$item_groups$item_grouping_f))
   # Make sure the data covers the correct range
   faostat$yield%<>%filter(Year>=syear & Year<=fyear)
   faostat$Area%<>%filter(Year>=syear & Year<=fyear)
   faostat$Prod%<>%filter(Year>=syear & Year<=fyear)
   sevvies%<>%filter(year>=syear & year<=fyear & ISO3 %in% unique(faostat$Prod$ISO3.CODE))%>%
     mutate(mu=case_when(is.na(mu) | is.na(sd) | is.infinite(mu) | is.infinite(sd) ~ 0, T ~ mu),
-           sd=case_when(is.infinite(sd)~1e-6, T ~ sd))
-  # Extract country ISO3C codes
-  isos <- unique(faostat$Prod$ISO3.CODE)
+           sd=case_when(is.na(mu) | is.na(sd) | is.infinite(mu) | is.infinite(sd) ~ 1e-6, T ~ sd))
   # Normalise the disaster severity globally to ensure the mu+3*sigma is not larger than the median production
   # (this implies that it is very unlikely that a disaster will occur that will result in losing more than 50% of the production)
   scalefac<-median(log(faostat$Prod$Production),na.rm = T)/median(sevvies$mu+sevvies$sd*3,na.rm = T)
@@ -215,19 +275,18 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023){
   prod <- prod %>%
     complete(ISO3.CODE, item_grouping_f, Year, fill = list(Prod = 0)) %>%  # Fill missing commodities with zero
     arrange(ISO3.CODE, item_grouping_f, Year)
+  # Extract country ISO3C codes
+  isos <- unique(prod$ISO3.CODE)
   # Filter just in case
-  redsev%<>%filter(ISO3%in%unique(prod$ISO3.CODE))
+  redsev%<>%filter(ISO3%in%isos)
   # Dimensions declaration
-  n_t <- fyear-syear+1L        # Number of years
   n_isos <- length(isos)      # Number of countries
   n_haz <- length(unique(redsev$haz_grp))       # Number of hazard types
-  n_dis <- 30 # number of disasters per country
-  n_com <- length(unique(faostat$item_groups$item_grouping_f))
   # Timeline
   time <- seq(1, n_t)
   yrs <- seq(syear,fyear)
   # Hazard types per disaster 
-  htype <- array(NA, dim = c(n_isos, n_dis)) 
+  htype <- array(0, dim = c(n_isos, n_dis)) 
   # Disaster occurrence flag
   flag <- array(0, dim = c(n_isos, n_t, n_dis),
                 dimnames = list(isos, as.character(yrs), NULL)) 
@@ -235,9 +294,9 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023){
   hazdur <- array(0, dim = c(n_isos, n_t, n_dis),
                   dimnames = list(isos, as.character(yrs), NULL)) 
   # Disaster duration start to end window per year
-  ts <- array(NA, dim = c(n_isos, n_t, n_dis),
+  ts <- array(0, dim = c(n_isos, n_t, n_dis),
               dimnames = list(isos, as.character(yrs), NULL)) 
-  tf <- array(NA, dim = c(n_isos, n_t, n_dis),
+  tf <- array(0, dim = c(n_isos, n_t, n_dis),
               dimnames = list(isos, as.character(yrs), NULL)) 
   # Disaster event_id 
   ev_id <- array(NA, dim = c(n_isos, n_dis)) 
@@ -261,7 +320,7 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023){
     # All years in the data
     for(t in time){
       # All-year commodities data
-      y[j,t, ] <- arrange(prod$Prod[prod$ISO3.CODE==is & prod$Year==yrs[t]],item_grouping_f)
+      y[j,t, ] <- pull(arrange(prod[prod$ISO3.CODE==is & prod$Year==yrs[t],],item_grouping_f),Prod)
     }
     # Filter only the relevant disaster severity records
     isosev<-redsev%>%filter(ISO3==is)
@@ -310,17 +369,16 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023){
     } else {
       n_dis_v[j] <- 0
       ev_id[j,1:n_dis_v[j]] <- NA
-      htype[j,1:n_dis_v[j]] <- NA
+      htype[j,1:n_dis_v[j]] <- 0
       iprox[j,1:n_dis_v[j], ] <- 0
       mu_dis[j,1:n_dis_v[j], ] <- 0 
       sig_dis[j,1:n_dis_v[j], ] <- 1e-6
     }
   }
   # Create a row index that labels each country's disasters for the matrix
-  redsev%<>% 
-    distinct(across(-item_grouping_f), .keep_all = TRUE)%>%
-    group_by(ISO3)%>% 
-    mutate(evvie = 1:n())
+  redsev%<>%dplyr::select(-c(item_grouping_f,mu,sd))%>%
+    distinct()%>%group_by(ISO3)%>%mutate(evvie = 1:n())%>%ungroup()
+  # distinct(across(-item_grouping_f), .keep_all = TRUE)%>%
   # Now for the awkward disaster variables
   for(i in 1:nrow(redsev)){
     iso <- redsev$ISO3[i]
@@ -331,6 +389,7 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023){
     efrac <- redsev$e_frac[i]
     duration_years <- redsev$duration_years[i]
     endt <- redsev$endt[i]
+    if(efrac>1) ey<-floor(endt)
     # Iterate over the years the disaster was present or the post-disaster years
     for(t in sy:fyear){
       t_chr <- as.character(t)
@@ -338,49 +397,56 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023){
       flag[iso, t_chr, event] <- 1
       # During the year the hazard occurs, ensure to split between the hazard-duration impact and the post-disaster-decay impact
       if(t == sy){ 
+        # If the hazard duration is entirely within one year
         if((1 - sfrac) >= duration_years){
           ts[iso, t_chr, event] <- 0
           tf[iso, t_chr, event] <- 1 - sfrac - duration_years
+          # If the hazard duration lasts more than a year: no contribution to dsev as the contribution comes from the hazard duration element
         } else { 
-          ts[iso, t_chr, event] <- 1
-          tf[iso, t_chr, event] <- 1
+          ts[iso, t_chr, event] <- 0
+          tf[iso, t_chr, event] <- 0
         }
         # Hazard duration information only transmitted to the model during the hazard year
         hazdur[iso, t_chr, event] <- duration_years
-      } else if(t < endt){      
+        # intermediate years where hazard is still active
+      } else if(t < ey){      
         ts[iso, t_chr, event] <- 1
         tf[iso, t_chr, event] <- 1
-        
-      } else if(t > endt & t < (endt + 1)){
+        # Final year: Hazard ends sometime in the year
+      } else if(t==ey){
         ts[iso, t_chr, event] <- 0
-        tf[iso, t_chr, event] <- t - endt
-      } else {
-        ts[iso, t_chr, event] <- t - 1 - endt
-        tf[iso, t_chr, event] <- t - endt
+        tf[iso, t_chr, event] <- t+1-endt
+        # After the hazard is over, calculate the remainder of the disaster decay times
+      } else { 
+        ts[iso, t_chr, event] <- t - endt
+        tf[iso, t_chr, event] <- t + 1 - endt
       }
+      if(any(ts<0)|any(tf<0)) stop(paste0("Issues with time variables: check country ",iso," for sevvies row number ",i))
     }
   }
   
   warning("You also want the price information here so that stan can calculate the losses in USD")
-  
-  return(list(n_t = n_t,
-              n_isos = n_isos,
-              n_dis = n_dis_v,
-              n_haz = n_haz,
-              n_com = n_com,
-              time = time,
-              isos = isos,
-              y = y,  
-              flag = flag,
-              ts = ts,
-              tf = tf,
-              hazdur = hazdur,
-              htype = htype,
-              ev_id = ev_id,
-              iprox = iprox,
-              mu_AR1 = mu_AR1,
-              sig_AR1 = sig_AR1,
-              mu_dis=mu_dis,
-              sig_dis=sig_dis))
+  # Generate the list for stan
+  fdf<-list(n_t = n_t,
+            n_isos = n_isos,
+            n_dis = n_dis_v,
+            n_haz = n_haz,
+            n_com = n_com,
+            time = time,
+            isos = isos,
+            y = y,  
+            flag = flag,
+            ts = ts,
+            tf = tf,
+            hazdur = hazdur,
+            htype = htype,
+            ev_id = ev_id,
+            iprox = iprox,
+            mu_AR1 = mu_AR1,
+            sig_AR1 = sig_AR1,
+            mu_dis=mu_dis,
+            sig_dis=sig_dis)
+  # Check through the list!
+  fdf%>%Check4Stan()
 }
 
