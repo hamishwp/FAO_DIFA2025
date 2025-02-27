@@ -242,8 +242,8 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023){
            duration_years = as.numeric(fdate - sdate) / 365)%>%
     mutate(duration_years=case_when(duration_years<0 ~ 1e-6, T ~ duration_years),
            endt = sy + s_frac + duration_years,
-           ey=case_when(efrac>1 ~ floor(endt), T ~ ey),
-           efrac=case_when(efrac>1 ~ 0.999, T ~ efrac))%>%
+           ey=case_when(e_frac>1 ~ floor(endt), T ~ ey),
+           e_frac=case_when(e_frac>1 ~ 0.999, T ~ e_frac))%>%
     arrange(ISO3, sdate)
   # Calculate average disaster severity per hazard then use this to normalise the weighting in the top-n most severe
   weights<-sevvies%>%group_by(haz_grp)%>%reframe(hazweight=1/mean(mu,na.rm=T))%>%
