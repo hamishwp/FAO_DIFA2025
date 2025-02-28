@@ -88,7 +88,7 @@ model {
         mu = beta_dis*dsev.*(1 + isev) + to_vector(beta_y1[iso, ]).*to_vector(y[iso, ttt-1, ]); // Auto-Regressive first order (AR1) model
       }
       // Sample the commodity data!
-      to_vector(y[iso, ttt, ]) ~ normal(mu, to_vector(sig_AR1[iso,]));
+      to_vector(y[iso, ttt, ]) ~ normal(mu, to_vector(sigma[iso,]));
     }
     // GPR AR1 mean function coefficient - empirical Bayes
     beta_y1[iso,] ~ normal(to_vector(mu_AR1[iso,]), to_vector(sig_AR1[iso,])); 
