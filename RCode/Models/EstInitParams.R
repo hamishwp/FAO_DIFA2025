@@ -37,11 +37,13 @@ InitParams<-function(fdf, iprox_dat=T, GPR=F){
     if(iprox_dat){
       return(function(chainnum){
         list(iprox = fdf$mu_dis,
-             beta_y1 = fdf$mu_AR1)
+             beta_y1 = fdf$mu_AR1,
+             sigma = fdf$sig_AR1)
       })
     } else {
       return(function(chainnum){
-        list(beta_y1 = fdf$mu_AR1)
+        list(beta_y1 = fdf$mu_AR1,
+             sigma = fdf$sig_AR1)
       })
     }
   }
