@@ -16,9 +16,14 @@ hyppars<-list(chains=8,iter=3000,burnin=1000,adapt=0.95,maxtree=30)
 source("./RCode/Setup/GetPackages.R")
 source("./RCode/Setup/Functions.R")
 # Which STAN model to use?
-stan_model_code <- "./RCode/Models/DIFA2025_redredDisSev_noGPR_V2.stan" 
+stan_model_code <- "./RCode/Models/DIFA2025_redredDisSev_empAR_V2.stan" 
+iprox_dat <- ifelse(grepl("redDisSev",stan_model_code),F,T)
+GPR <- ifelse(!(grepl("noGPR",stan_model_code) | grepl("empAR",stan_model_code)),T,F)
+empAR <- ifelse(grepl("empAR",stan_model_code),T,F)
 # Save all files with this time-dependent extension
 save_str<-paste0("_",str_replace_all(str_replace_all(Sys.time()," ","_"),":",""))
+# Methodology to parameterise the model (can be 'MCMC', 'Optim' or 'VI'):
+methody <- "MCMC"
 
 # Run the stan model
 TrainModel<-function(fdf,model){
@@ -27,7 +32,7 @@ TrainModel<-function(fdf,model){
   # Compile the stan code
   stan_model <- rstan::stan_model(model)
   # Initialisations
-  inits_f<-InitParams(fdf,iprox_dat = grepl("redDisSev",model),GPR = !grepl("noGPR",model))
+  inits_f<-InitParams(fdf,iprox_dat = iprox_dat,GPR = GPR,empAR = empAR)
   # MCMC Sampling 
   mcmc_results <- rstan::sampling(
     object = stan_model, 
@@ -42,8 +47,46 @@ TrainModel<-function(fdf,model){
   )
 }
 
+# Instead of MCMC use optimisation
+TrainModel_Optim <- function(fdf, model) {
+  # Ensure that Stan runs properly with parallel computation enabled
+  rstan::rstan_options(auto_write = TRUE)
+  # Compile the stan code
+  stan_model <- rstan::stan_model(model)
+  # Initializations (may not be needed for optimization)
+  inits_f <- InitParams(fdf, iprox_dat = iprox_dat, GPR = GPR, empAR = empAR)
+  # Run Stan optimization instead of MCMC sampling
+  optim_results <- rstan::optimizing(
+    object = stan_model,
+    data = fdf,
+    init = inits_f,
+    seed = 42,
+    hessian = TRUE)
+  
+  return(optim_results)
+}
+
+# Variational Inference
+TrainModel_VI <- function(fdf, model) {
+  # Ensure that Stan runs properly with parallel computation enabled
+  rstan::rstan_options(auto_write = TRUE)
+  # Compile the Stan model
+  stan_model <- rstan::stan_model(model)
+  # Initializations (optional, depends on the model)
+  inits_f <- InitParams(fdf, iprox_dat = iprox_dat, GPR = GPR, empAR = empAR)
+  # Variational Inference (VI) instead of MCMC sampling
+  vi_results <- rstan::vb(
+    object = stan_model,
+    data = fdf,
+    init = inits_f,
+    seed = 42,
+    output_samples = 1500)
+  
+  return(vi_results)
+}
+
 # Main function
-execDIFA<-function(presave=T){
+execDIFA<-function(method="MCMC",presave=T){
   # Extract, transform then merge data (functions found in 'RCode/Data_Wrangling/')
   if(presave & file.exists("./Data/Results/difa2025.RData")) {difa<-readRDS("./Data/Results/difa2025.RData") 
   } else difa<-getData(syear=syear,fyear=fyear)
@@ -54,14 +97,20 @@ execDIFA<-function(presave=T){
   # Prepare the data to be input into the stan model
   fdf<-Prepare4Model(difa$faostat,sevvies,fyear=fyear,syear=syear)
   # Train the model
-  mGPR<-TrainModel(fdf=fdf,model=stan_model_code)
+  if(method=="MCMC") {
+    mGPR<-TrainModel(fdf=fdf,model=stan_model_code)
+  } else if(method=="VI"){
+    mGPR<-TrainModel_VI(fdf=fdf,model=stan_model_code)
+  } else {
+    mGPR<-TrainModel_Optim(fdf=fdf,model=stan_model_code)
+  }
   
   return(list(difa=difa,
               fdf=fdf,
               mGPR=mGPR))
 }
 
-mcmc_results<-execDIFA()
+mcmc_results<-execDIFA(method=methody)
 saveRDS(mcmc_results,paste0("./Data/Results/fullresults_",str_split(str_split(stan_model_code,"/")[[1]][4],".stan")[[1]][1],save_str,".RData"))
 
 ###### TODAY ######

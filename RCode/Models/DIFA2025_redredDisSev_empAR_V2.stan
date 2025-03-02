@@ -38,8 +38,8 @@ parameters {
   vector<lower=0>[n_haz] hsev; // Hazard severity, per hazard type
   vector[n_com] isev; //  Item/Commodity severity
   real beta_dis; // Disaster-severity regression coefficient
-  real <lower=0>beta_dur; // Hazard duration regression coefficient
-  real beta_y1; // AR1 mean function trend, per country
+  real<lower=0> beta_dur; // Hazard duration regression coefficient
+  real<lower=0> beta_y1; // AR1 mean function trend, per country
   real<lower=0> sigma; // AR1 standard deviation function trend, per country
 }
 
@@ -49,8 +49,6 @@ model {
   beta_dis ~ normal(0,20); // Disaster-severity regression coefficient
   beta_dur ~ gamma(2,1); // Hazard duration coefficient
   isev ~ normal(0,1); // Commodity severity
-  beta_y1 ~ gamma(2,2);
-  sigma ~ gamma(2,1);
   // GPR mean function
   vector[n_com] mu;
   vector[n_com] red_sig;
@@ -93,6 +91,9 @@ model {
       to_vector(y[iso, ttt, ]) ~ normal(mu, red_sig);
     }
   }
+  // Place these priors here so that we use the initial parameter estimates
+  beta_y1 ~ gamma(2,2);
+  sigma ~ gamma(2,1);
 }
 
 
