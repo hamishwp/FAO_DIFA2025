@@ -34,8 +34,8 @@ estimate_gp_params <- function(y_data, time_points, priors=T) {
 
 InitParams<-function(fdf, iprox_dat=T, GPR=F, empAR=F){
   if(empAR) return(function(chainnum){
-    list(beta_y1 = 1,
-         sigma = 1)
+    list(gamAR1 = 1,
+         sdAR1 = 1)
   })
   if(!GPR) {
     if(iprox_dat){
