@@ -32,7 +32,12 @@ estimate_gp_params <- function(y_data, time_points, priors=T) {
   # ))
 }
 
-InitParams<-function(fdf, iprox_dat=T, GPR=F){
+InitParams<-function(fdf, iprox_dat=T, GPR=F, empAR=F){
+  if(empAR) return(function(chainnum){
+    list(iprox = fdf$mu_dis,
+         beta_y1 = 1,
+         sigma = 1)
+  })
   if(!GPR) {
     if(iprox_dat){
       return(function(chainnum){
