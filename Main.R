@@ -16,7 +16,7 @@ hyppars<-list(chains=8,iter=3000,burnin=1000,adapt=0.95,maxtree=30)
 source("./RCode/Setup/GetPackages.R")
 source("./RCode/Setup/Functions.R")
 # Which STAN model to use?
-stan_model_code <- "./RCode/Models/DIFA2025_redredDisSev_empAR_V2.stan" 
+stan_model_code <- "./RCode/Models/DIFA2025_redredDisSev_noGPR_V2.stan" 
 iprox_dat <- ifelse(grepl("redDisSev",stan_model_code),F,T)
 GPR <- ifelse(!(grepl("noGPR",stan_model_code) | grepl("empAR",stan_model_code)),T,F)
 empAR <- ifelse(grepl("empAR",stan_model_code),T,F)

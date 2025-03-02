@@ -91,7 +91,8 @@ model {
       to_vector(y[iso, ttt, ]) ~ normal(mu, to_vector(sigma[iso,]));
     }
     // GPR AR1 mean function coefficient - empirical Bayes
-    beta_y1[iso,] ~ normal(to_vector(mu_AR1[iso,]), to_vector(sig_AR1[iso,])); 
+    beta_y1[iso,] ~ normal(to_vector(mu_AR1[iso,]), 3);
+                           // to_vector(sig_AR1[iso,])); 
     // Calculate the shape and scale parameters for the Gamma distribution
     alpha = k / to_vector(sig_AR1[iso,]);
     beta = to_vector(sig_AR1[iso,])^2 / k;
