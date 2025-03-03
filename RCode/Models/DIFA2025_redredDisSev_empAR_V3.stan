@@ -33,6 +33,19 @@ data {
   array[n_isos,n_com] real<lower=0> sig_AR1;
 }
 
+transformed data {
+  // Reparameterise the problem to increase numerical stability
+  array[n_isos,n_t,n_com] real y_p = rep_array(0,n_isos,n_t,n_com);  
+  // Placeholder for later
+  for(iso in 1:n_isos){
+    for(ttt in 2:n_t){
+      for(ic in 1:n_com){
+        y_p[iso,ttt,ic] = (y[iso, ttt, ic] - mu_AR1[iso, ic]*y[iso, ttt-1, ic]) ./ sig_AR1[iso, ic];
+      }
+    }
+  }
+}
+
 parameters {
   // Disaster parameters
   vector<lower=0>[n_haz] hsev; // Hazard severity, per hazard type
@@ -51,19 +64,20 @@ model {
   beta_dis ~ normal(0,5); // Disaster-severity regression coefficient
   beta_dur ~ gamma(2,1); // Hazard duration coefficient
   isev ~ normal(0,1); // Commodity severity
-  sdAR1 ~ gamma(2,1);
-  gamAR1 ~ gamma(2,1);
-  // GPR mean function
-  vector[n_com] mu;
-  vector[n_com] dsev;
-  // real k = 0.1; // Proportionality constant for variance to mean ratio in AR1
+  sdAR1 ~ gamma(2,2);
+  gamAR1 ~ gamma(2,2);
+  real k = 0.1; // Proportionality constant for variance to mean ratio in AR1
+  real mu_rep; // Reparameterised AR1 mean
+  array[n_isos,n_t,n_com] real mu; // Raw AR1 mean
+  vector[n_com] dsev; // Cumulative total disaster severity 
   // Per country, sample from the model!
   for(iso in 1:n_isos){
-    // Set the GPR mean function to zero
-    mu = rep_vector(0, n_com);
     vector[n_dis[iso]] flag_vec;
+    // Set the first value of the time series to not contribute to the likelihood
+    mu[iso, 1, ] = y[iso, 1, ];  
+    y_p[iso, 1, ] ~ std_normal(); 
     // Sample through the EOY values
-    for(ttt in 1:n_t){
+    for(ttt in 2:n_t){
       // Set the disaster severity to zero at first, as well as the GPR mean function
       dsev = rep_vector(0,n_com);
       // Save some computation
@@ -79,22 +93,15 @@ model {
           dsev[ic] = sum(flag_vec.*(
             iphs.*to_vector(hazdur[iso, ttt, 1:n_dis[iso]])*beta_dur +
             iprox_vec.*iphs.*(exp(-to_vector(ts[iso,ttt, 1:n_dis[iso]])./iphs)-
-            exp(-to_vector(tf[iso,ttt, 1:n_dis[iso]])./iphs)
-            )));
+            exp(-to_vector(tf[iso,ttt, 1:n_dis[iso]])./iphs))));
+            // Set the GPR mean function
+            mu[iso, ttt, ic] = beta_dis*dsev[ic].*(1 + isev[ic]) + gamAR1.*mu_AR1[iso, ic].*y[iso, ttt-1, ic]; // Auto-Regressive first order (AR1) model
+            // Refactor the mean and s.d.
+            mu_rep = mu[iso, ttt, ic] - mu_AR1[iso, ic].*y[iso, ttt-1, ic];
+            // Reparameterized likelihood
+            y_p[iso, ttt, ic] ~ normal(mu_rep,sdAR1); 
         }
       }
-      // Set the GPR mean function
-      if (ttt == 1) {
-        mu = to_vector(y[iso, ttt, ]);  // No past y available
-      } else {
-        mu = beta_dis*dsev.*(1 + isev) + gamAR1.*to_vector(mu_AR1[iso, ]).*to_vector(y[iso, ttt-1, ]); // Auto-Regressive first order (AR1) model
-      }
-      // Modify the variance in the AR commodity trends
-      sddie = to_vector(sig_AR1[iso,]).*sdAR1;
-      // Reparameterisation
-      y_p~normal(rep(0,n_com),rep(1,n_com));
-      // Sample the commodity data!
-      to_vector(y[iso, ttt, ]) = mu + sddie.*y_p;
     }
   }
 }

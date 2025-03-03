@@ -30,6 +30,7 @@ GetSourceFiles<-function(){
   # Models required
   source(paste0(directory,'RCode/Models/DisasterSeverity_Model.R'))
   source(paste0(directory,'RCode/Models/EstInitParams.R'))
+  source(paste0(directory,'RCode/Models/Methods.R'))
   
   return(T)
 }

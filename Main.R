@@ -25,20 +25,24 @@ save_str<-paste0("_",str_replace_all(str_replace_all(Sys.time()," ","_"),":","")
 
 # Main function
 execDIFA<-function(method="MCMC",presave=T){
-  # Extract, transform then merge data (functions found in 'RCode/Data_Wrangling/')
-  if(presave & file.exists("./Data/Results/difa2025.RData")) {difa<-readRDS("./Data/Results/difa2025.RData") 
-  } else difa<-getData(syear=syear,fyear=fyear)
-  # Train the disaster severity model and predict on EM-DAT+UCDP data
-  if(presave & file.exists("./Data/Results/sevvies.RData")) {sevvies<-readRDS("./Data/Results/sevvies.RData") 
-  } else sevvies<-GetDisSev(difa$dissie$dessie,difa$dissie$emdat)%>%
-    ConvHe2Tonnes(difa$faostat)
-  # Prepare the data to be input into the stan model
-  fdf<-Prepare4Model(difa$faostat,sevvies,fyear=fyear,syear=syear)
+  if(presave & file.exists("./Data/Results/fdf.RData")) {
+    fdf<-readRDS("./Data/Results/fdf.RData")
+  } else {
+    # Extract, transform then merge data (functions found in 'RCode/Data_Wrangling/')
+    if(presave & file.exists("./Data/Results/difa2025.RData")) {difa<-readRDS("./Data/Results/difa2025.RData") 
+    } else difa<-getData(syear=syear,fyear=fyear)
+    # Train the disaster severity model and predict on EM-DAT+UCDP data
+    if(presave & file.exists("./Data/Results/sevvies.RData")) {sevvies<-readRDS("./Data/Results/sevvies.RData") 
+    } else sevvies<-GetDisSev(difa$dissie$dessie,difa$dissie$emdat)%>%
+        ConvHe2Tonnes(difa$faostat)
+    # Prepare the data to be input into the stan model
+    fdf<-Prepare4Model(difa$faostat,sevvies,fyear=fyear,syear=syear)
+    rm(difa)
+  }
   # Train the model
   mGPR<-TrainModel(fdf=fdf,model=stan_model_code,method=method)
   
-  return(list(difa=difa,
-              fdf=fdf,
+  return(list(fdf=fdf,
               mGPR=mGPR))
 }
 
