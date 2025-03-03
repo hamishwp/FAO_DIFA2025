@@ -46,7 +46,7 @@ parameters {
 model {
   // Priors
   hsev ~ gamma(2,1); // Hazard severity
-  beta_dis ~ normal(0,20); // Disaster-severity regression coefficient
+  beta_dis ~ normal(0,5); // Disaster-severity regression coefficient
   beta_dur ~ gamma(2,1); // Hazard duration coefficient
   isev ~ normal(0,1); // Commodity severity
   // GPR mean function
@@ -54,7 +54,10 @@ model {
   vector[n_com] dsev;
   vector[n_com] alpha;
   vector[n_com] beta;
-  real k = 1; // Proportionality constant for variance to mean ratio in AR1
+  // Commodity data
+  vector[n_com] real<lower=0> y_p;
+  // Proportionality constant for variance to mean ratio in AR1
+  real k = 0.1; 
   // Per country, sample from the model!
   for(iso in 1:n_isos){
     // Set the GPR mean function to zero
@@ -87,11 +90,13 @@ model {
       } else {
         mu = beta_dis*dsev.*(1 + isev) + to_vector(beta_y1[iso, ]).*to_vector(y[iso, ttt-1, ]); // Auto-Regressive first order (AR1) model
       }
+      // Reparameterisation
+      y_p~normal(rep(0,n_com),rep(1,n_com));
       // Sample the commodity data!
-      to_vector(y[iso, ttt, ]) ~ normal(mu, to_vector(sigma[iso,]));
+      to_vector(y[iso, ttt, ]) = mu + to_vector(sigma[iso,]).*y_p
     }
     // GPR AR1 mean function coefficient - empirical Bayes
-    beta_y1[iso,] ~ normal(to_vector(mu_AR1[iso,]), 3);
+    beta_y1[iso,] ~ normal(to_vector(mu_AR1[iso,]), 1);
                            // to_vector(sig_AR1[iso,])); 
     // Calculate the shape and scale parameters for the Gamma distribution
     alpha = k / to_vector(sig_AR1[iso,]);

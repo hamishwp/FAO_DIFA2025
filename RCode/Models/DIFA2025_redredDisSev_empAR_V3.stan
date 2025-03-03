@@ -48,17 +48,15 @@ parameters {
 model {
   // Priors
   hsev ~ gamma(2,1); // Hazard severity
-  beta_dis ~ normal(0,20); // Disaster-severity regression coefficient
+  beta_dis ~ normal(0,5); // Disaster-severity regression coefficient
   beta_dur ~ gamma(2,1); // Hazard duration coefficient
   isev ~ normal(0,1); // Commodity severity
-  sdAR1 ~ gamma(2,2);
-  gamAR1 ~ gamma(2,2);
+  sdAR1 ~ gamma(2,1);
+  gamAR1 ~ gamma(2,1);
   // GPR mean function
   vector[n_com] mu;
   vector[n_com] dsev;
-  vector[n_com] alpha;
-  vector[n_com] beta;
-  real k = 1; // Proportionality constant for variance to mean ratio in AR1
+  // real k = 0.1; // Proportionality constant for variance to mean ratio in AR1
   // Per country, sample from the model!
   for(iso in 1:n_isos){
     // Set the GPR mean function to zero
@@ -93,8 +91,10 @@ model {
       }
       // Modify the variance in the AR commodity trends
       sddie = to_vector(sig_AR1[iso,]).*sdAR1;
+      // Reparameterisation
+      y_p~normal(rep(0,n_com),rep(1,n_com));
       // Sample the commodity data!
-      to_vector(y[iso, ttt, ]) ~ normal(mu, sddie);
+      to_vector(y[iso, ttt, ]) = mu + sddie.*y_p
     }
   }
 }
