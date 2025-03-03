@@ -93,7 +93,7 @@ model {
       // Reparameterisation
       y_p~normal(rep(0,n_com),rep(1,n_com));
       // Sample the commodity data!
-      to_vector(y[iso, ttt, ]) = mu + to_vector(sigma[iso,]).*y_p
+      to_vector(y[iso, ttt, ]) = mu + to_vector(sigma[iso,]).*y_p;
     }
     // GPR AR1 mean function coefficient - empirical Bayes
     beta_y1[iso,] ~ normal(to_vector(mu_AR1[iso,]), 1);

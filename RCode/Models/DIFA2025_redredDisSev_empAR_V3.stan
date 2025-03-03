@@ -94,7 +94,7 @@ model {
       // Reparameterisation
       y_p~normal(rep(0,n_com),rep(1,n_com));
       // Sample the commodity data!
-      to_vector(y[iso, ttt, ]) = mu + sddie.*y_p
+      to_vector(y[iso, ttt, ]) = mu + sddie.*y_p;
     }
   }
 }
