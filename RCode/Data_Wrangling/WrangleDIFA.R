@@ -534,7 +534,7 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023){
     reframe(Price17eq=mean(Price17eq,na.rm=T))%>%
     ImputePrices()
   # Weights for the likelihood
-  weights=fdf$sig_AR1/(apply(fdf$y,3,mean)); weights<- 1-(weights/max(weights))
+  weights=sig_AR1/(apply(y,3,mean)); weights<- 1-(weights/max(weights))
   # Generate the list for stan
   fdf<-list(n_t = n_t,
             n_isos = n_isos,

@@ -50,23 +50,23 @@ generate_y <- function(fdf, params) {
   outs%>%mutate(yobs=ydiff+y)%>%return()
 }
 
-params <- list(beta_dur = 1,
-               beta_dis = -10000,
-               hsev=rep(1,fdf$n_haz),
-               isev=rep(1,fdf$n_com),
-               beta_y1=rep(1,fdf$n_com),
-               sigma=1)
-outs<-generate_y(fdf,params)
-
-outs%>%group_by(ISO3,com)%>%reframe(meandiff=mean(ydiff,na.rm=T))%>%
-  ggplot()+geom_density(aes(abs(meandiff),colour=as.character(com)))+scale_x_log10()
-
-outs%>%group_by(ISO3,com)%>%reframe(meandiff=mean(dsev-ar,na.rm=T))%>%
-  ggplot()+geom_density(aes(abs(meandiff),colour=as.character(com)))+scale_x_log10()
-
-outs%>%ggplot()+geom_point(aes(y,sigma))+scale_x_log10()+scale_y_log10()+facet_wrap(~com)
-outs%>%ggplot()+geom_point(aes(y,yobs))+scale_x_log10()+scale_y_log10()+geom_abline(slope=1,intercept=0,colour="red")+
-  facet_wrap(~com)
+# params <- list(beta_dur = 1,
+#                beta_dis = -10000,
+#                hsev=rep(1,fdf$n_haz),
+#                isev=rep(1,fdf$n_com),
+#                beta_y1=rep(1,fdf$n_com),
+#                sigma=1)
+# outs<-generate_y(fdf,params)
+# 
+# outs%>%group_by(ISO3,com)%>%reframe(meandiff=mean(ydiff,na.rm=T))%>%
+#   ggplot()+geom_density(aes(abs(meandiff),colour=as.character(com)))+scale_x_log10()
+# 
+# outs%>%group_by(ISO3,com)%>%reframe(meandiff=mean(dsev-ar,na.rm=T))%>%
+#   ggplot()+geom_density(aes(abs(meandiff),colour=as.character(com)))+scale_x_log10()
+# 
+# outs%>%ggplot()+geom_point(aes(y,sigma))+scale_x_log10()+scale_y_log10()+facet_wrap(~com)
+# outs%>%ggplot()+geom_point(aes(y,yobs))+scale_x_log10()+scale_y_log10()+geom_abline(slope=1,intercept=0,colour="red")+
+#   facet_wrap(~com)
 
 estimate_gp_params <- function(y_data, time_points, priors=T) {
   # Create data frame with time and response variable
