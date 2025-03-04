@@ -33,6 +33,19 @@ data {
   array[n_isos,n_com] real<lower=0> sig_AR1;
 }
 
+transformed data {
+  // Reparameterise the problem to increase numerical stability
+  array[n_isos,n_t,n_com] real y_p = rep_array(0,n_isos,n_t,n_com);  
+  // Placeholder for later
+  for(iso in 1:n_isos){
+    for(ttt in 2:n_t){
+      for(ic in 1:n_com){
+        y_p[iso,ttt,ic] = (y[iso, ttt, ic] - mu_AR1[iso, ic]*y[iso, ttt-1, ic]) ./ sig_AR1[iso, ic];
+      }
+    }
+  }
+}
+
 parameters {
   // Disaster parameters
   vector<lower=0>[n_haz] hsev; // Hazard severity, per hazard type
@@ -40,7 +53,18 @@ parameters {
   real beta_dis; // Disaster-severity regression coefficient
   real <lower=0>beta_dur; // Hazard duration regression coefficient
   array[n_isos,n_com] real beta_y1; // AR1 mean function trend, per country
+  array[n_isos,n_com] real<lower=0> sigma_rep; // AR1 standard deviation function trend, per country
+}
+
+transformed parameters {
+  // Reparameterise the variance component of the AR element
   array[n_isos,n_com] real<lower=0> sigma; // AR1 standard deviation function trend, per country
+  real k = 0.1; // Variance to mean ratio of the gamma distribution
+  for (iso in 1:n_isos) {
+    for(ic in 1:n_com){
+      sigma[iso,ic] = fmin(100000000,fmax(1e-6, (sig_AR1[iso,ic]/sqrt(k)).*inv_gamma_cdf(exp(sigma_rep[iso,ic]) | k, 1)));
+    }
+  }
 }
 
 model {
@@ -50,21 +74,21 @@ model {
   beta_dur ~ gamma(2,1); // Hazard duration coefficient
   isev ~ normal(0,1); // Commodity severity
   // GPR mean function
-  vector[n_com] mu;
+  array[n_isos,n_t,n_com] real mu;
   vector[n_com] dsev;
-  vector[n_com] alpha;
-  vector[n_com] beta;
-  // Commodity data
-  vector[n_com] real<lower=0> y_p;
   // Proportionality constant for variance to mean ratio in AR1
-  real k = 0.1; 
+  real mu_rep; // Reparameterised AR1 mean
+  real sd_rep; // Reparameterised AR1 sd
   // Per country, sample from the model!
   for(iso in 1:n_isos){
-    // Set the GPR mean function to zero
-    mu = rep_vector(0, n_com);
     vector[n_dis[iso]] flag_vec;
+    // Set the first value of the time series to not contribute to the likelihood
+    mu[iso, 1, ] = y[iso, 1, ];  
+    y_p[iso, 1, ] ~ std_normal(); 
+    // Sample the normalised sigma of the commodity data
+    to_vector(sigma_rep[iso,]) ~ std_normal();
     // Sample through the EOY values
-    for(ttt in 1:n_t){
+    for(ttt in 2:n_t){
       // Set the disaster severity to zero at first, as well as the GPR mean function
       dsev = rep_vector(0,n_com);
       // Save some computation
@@ -80,29 +104,19 @@ model {
           dsev[ic] = sum(flag_vec.*(
             iphs.*to_vector(hazdur[iso, ttt, 1:n_dis[iso]])*beta_dur +
             iprox_vec.*iphs.*(exp(-to_vector(ts[iso,ttt, 1:n_dis[iso]])./iphs)-
-            exp(-to_vector(tf[iso,ttt, 1:n_dis[iso]])./iphs)
-            )));
+            exp(-to_vector(tf[iso,ttt, 1:n_dis[iso]])./iphs))));
+            // Set the GPR mean function
+            mu[iso, ttt, ic] = beta_dis*dsev[ic].*(1 + isev[ic]) + beta_y1[iso, ic].*y[iso, ttt-1, ic]; // Auto-Regressive first order (AR1) model
+            // Refactor the mean and s.d.
+            mu_rep = mu[iso, ttt, ic] - mu_AR1[iso, ic].*y[iso, ttt-1, ic];
+            sd_rep = sigma[iso,ic]/sig_AR1[iso, ic];
+            // Reparameterized likelihood
+            y_p[iso, ttt, ic] ~ normal(mu_rep,sd_rep); 
         }
       }
-      // Set the GPR mean function
-      if (ttt == 1) {
-        mu = to_vector(y[iso, ttt, ]);  // No past y available
-      } else {
-        mu = beta_dis*dsev.*(1 + isev) + to_vector(beta_y1[iso, ]).*to_vector(y[iso, ttt-1, ]); // Auto-Regressive first order (AR1) model
-      }
-      // Reparameterisation
-      y_p~normal(rep(0,n_com),rep(1,n_com));
-      // Sample the commodity data!
-      to_vector(y[iso, ttt, ]) = mu + to_vector(sigma[iso,]).*y_p;
     }
     // GPR AR1 mean function coefficient - empirical Bayes
     beta_y1[iso,] ~ normal(to_vector(mu_AR1[iso,]), 1);
-                           // to_vector(sig_AR1[iso,])); 
-    // Calculate the shape and scale parameters for the Gamma distribution
-    alpha = k / to_vector(sig_AR1[iso,]);
-    beta = to_vector(sig_AR1[iso,])^2 / k;
-    // Gamma prior for sigma
-    sigma[iso,] ~ gamma(alpha, beta);
   }
 }
 

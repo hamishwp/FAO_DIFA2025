@@ -119,6 +119,32 @@ GetFAOSTAT_Price<-function(syear=1990,fyear=NULL){
     )%>%
     mutate(
       Price17eq = Value/CPI_2017
+    )%>%
+    mutate(
+      Area.Code = Area.Code,
+      codenew_I = case_when( #We change Area.Code so this countries corresponds to the ones they became later (see below)
+        Area.Code == 62 ~ 238,
+        Area.Code == 277 ~ 276,
+        Area.Code == 15 ~ 255,
+        TRUE ~ Area.Code
+      ),
+      codenew_II = countrycode(
+        codenew_I, 
+        origin = "fao",
+        destination = "iso3c"
+      ),
+      ISO3.CODE = case_when(
+        Area == "Belgium-Luxembourg" ~ "BLX",
+        Area == "China, mainland" ~ "CHN",
+        Area == "Czechoslovakia" ~ "CSK",
+        Area == "Palestine" ~ "PSE",
+        Area == "Serbia and Montenegro" ~ "SCG",
+        Area == "USSR" ~ "SUN",
+        Area== "Yugoslav SFR" ~ "YUG",
+        Area == "South Sudan" ~ "SSN", #Former code states that countrycodes was not differentiating between sudan and south sudan, we do it manually
+        Area == "Sudan (former)" ~ "SDN",
+        TRUE ~ codenew_II
+      )
     )
 }
 

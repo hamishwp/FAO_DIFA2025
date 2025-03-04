@@ -102,16 +102,6 @@ ConvHe2Tonnes<-function(sevvies,faostat){
             propprod=avprod/sum(avprod))
   # Merge them
   heprod%<>%left_join(avprod,by=c("ISO3.CODE","item_grouping_f")); rm(avprod)
-  # Add price per tonne
-  
-  
-  
-  
-  pricy<-faostat$price
-  
-  
-  
-  
   # Based on expected losses in hectares, convert to expected production losses
   sevvies%>%filter(!is.na(mu) & !is.na(sd) & dep=="crops")%>%dplyr::select(-dep)%>%
     left_join(heprod,by=join_by(ISO3==ISO3.CODE),
@@ -119,6 +109,116 @@ ConvHe2Tonnes<-function(sevvies,faostat){
     mutate(mu=log(exp(mu)*propprod*avyield),
            sd=log(exp(sd)*propprod*avyield))%>%
     dplyr::select(-any_of(c("avyield","propprod","proportion")))
+}
+
+# Function to perform 5-fold cross-validation for spline uncertainty estimation
+crossval_prices <- function(years, prices, prediction_years, folds = 5, method="spline") {
+  n <- length(years)
+  # Randomly assign each data point to one of the folds
+  fold_ids <- sample(rep(1:folds, length.out = n))
+  residuals <- numeric(n)  # Store residuals
+  predictions <- matrix(NA, nrow = length(prediction_years), ncol = folds)  # Store CV predictions
+  # Estimate mean and s.d. over CV folds
+  for (fold in 1:folds) {
+    # Training: Exclude the current fold
+    train_years <- years[fold_ids != fold]
+    train_prices <- prices[fold_ids != fold]
+    # Test: Only include the current fold
+    test_years <- years[fold_ids == fold]
+    test_prices <- prices[fold_ids == fold]
+    if(method=="spline"){
+      # Fit spline model on training data
+      spline_model <- splinefun(train_years, train_prices, method = "natural")
+      # Compute absolute residuals
+      residuals[fold_ids == fold] <- abs(test_prices - spline_model(test_years))
+      # Predict all years for this fold and store them
+      predictions[, fold] <- spline_model(prediction_years)
+    } else if(method=="GPR"){
+      # Fit Gaussian Process Regression (GPR) model
+      gpr_model <- kernlab::gausspr(Price17eq ~ Year, 
+                           data = data.frame(Year = train_years, Price17eq = train_prices), 
+                           kernel = "rbfdot", 
+                           kpar = "automatic", 
+                           var = 1e-3, 
+                           variance.model = TRUE)
+      # Predict test set residuals
+      residuals[fold_ids == fold] <- abs(test_prices - kernlab::predict(gpr_model, newdata = data.frame(Year = test_years), type = "response"))
+      # Predict full set of years
+      predictions[, fold] <- kernlab::predict(gpr_model, newdata = data.frame(Year = prediction_years), type = "response")
+    }
+  }
+  # Compute mean prediction across folds
+  mu_cv_price <- rowMeans(predictions, na.rm = TRUE)
+  # Estimate uncertainty as the mean absolute residual, avoiding zero uncertainty
+  residual_sd <- pmax(mean(residuals, na.rm = TRUE), 1e-6)
+  
+  return(list(mu_price = mu_cv_price, sig_price = rep(residual_sd,length(mu_cv_price)))) 
+}
+
+# Function to perform interpolation and estimate uncertainty on the FAOSTAT commodity-price data
+ImputePrices <- function(price_df, missthresh_GPR = 0.3, missthresh_nearest = 0.6) {
+  # Get unique items and full range of years
+  all_items <- unique(price_df$item_grouping_f)
+  all_years <- seq(min(price_df$Year), max(price_df$Year))  # Full year range
+  total_years <- length(all_years)
+  all_isos <- unique(price_df$ISO3.CODE)
+  # Create empty lists to store results
+  mu_price <- array(NA,dim = c(length(all_isos),length(all_years),length(all_items)))
+  sig_price <- array(NA,dim = c(length(all_isos),length(all_years),length(all_items)))
+  # Scan over countries and items
+  for(i in 1:length(all_isos)){
+    iso <- all_isos[i]
+    for (j in 1:length(all_items)) {
+      item <- all_items[j]
+      # Filter for the current item
+      item_data <- price_df %>% 
+        filter(ISO3.CODE==iso & item_grouping_f == item) %>% 
+        arrange(Year)
+      # In case there is no data at all:
+      if(nrow(item_data)==0){
+        mu_price[i,,j] <- 0
+        sig_price[i,,j] <- 1e-6
+        
+        next
+      }
+      # Identify missing years
+      indies <- is.na(item_data$Price17eq)
+      missing_years <- all_years[indies]
+      missing_proportion <- length(missing_years) / total_years
+      # Combine observed and missing years for prediction
+      prediction_years <- item_data$Year[indies]
+      observed_years <- item_data$Year[!indies]
+      # Get observed years and prices
+      observed_prices <- item_data$Price17eq[!indies]
+      # Prepopulate the matrices
+      mu_price[i,,j] <- item_data$Price17eq
+      sig_price[i,,j] <- 1e-6
+      
+      if (missing_proportion > missthresh_nearest) {
+        # High missingness: Nearest Value Imputation
+        # Approximate missing values using the nearest available value
+        nearest_values <- approx(x = observed_years, y = observed_prices, xout = prediction_years, method = "constant", rule = 2)
+        mu_price[i,indies,j] <- nearest_values$y
+        # Compute overall standard deviation of observed prices
+        global_sd <- ifelse(length(observed_prices) > 1, sd(observed_prices, na.rm = TRUE), 1e-6)
+        sig_price[i,indies,j] <- global_sd + 1e-6  # Use overall variance
+      } else if (missing_proportion > missthresh_GPR) {
+        # Moderate missingness: Gaussian Process Regression
+        cv_results <- crossval_prices(observed_years, observed_prices, prediction_years, method="GPR")
+        # Extract outputs
+        mu_price[i, indies, j] <- cv_results$mu_price
+        sig_price[i, indies, j] <- cv_results$sig_price
+      } else {
+        # Low missingness: Cubic Spline Interpolation using 5-fold cross-validation
+        cv_results <- crossval_prices(observed_years, observed_prices, prediction_years, method="spline")
+        # Extract outputs
+        mu_price[i, indies, j] <- cv_results$mu_price
+        sig_price[i, indies, j] <- cv_results$sig_price
+      }
+    }
+  }
+  
+  return(list(mu_price = mu_price, sig_price = sig_price))
 }
 
 # Prepare the DIFA data to have it in the correct format for modelling
@@ -328,10 +428,11 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023){
     # Compute AR(1) estimates with pre-filled zeros
     armod <- prod %>% filter(ISO3.CODE == is) %>% group_by(item_grouping_f) %>%
       reframe(AR1 = ifelse(n() > 1, Rfast::ar1(Prod)[["phi"]], 0),  # If only one value, return 0 for AR1
-              sigAR1 = ifelse(n() > 1, sqrt(Rfast::ar1(Prod)[["sigma"]]), 1e-9))%>%  # If only one value, return very small value
+              # sigAR1 = ifelse(n() > 1, max(sd(Prod,na.rm = T),1e-6,na.rm = T), 1e-6))%>%  # If only one value, return very small value
+              sigAR1 = ifelse(n() > 1, max(Rfast::ar1(Prod)[["sigma"]],1e-6,na.rm = T), 1e-6))%>%  # If only one value, return very small value
       right_join(data.frame(item_grouping_f = commods), by = "item_grouping_f") %>%
       mutate(AR1 = replace_na(AR1, 0), # Replace NA in AR1 with 0
-             sigAR1 = replace_na(sigAR1, 1e-9))%>% # Replace NA in sigAR1 with really small but non-zero value
+             sigAR1 = replace_na(sigAR1, 1e-6))%>% # Replace NA in sigAR1 with really small but non-zero value
       arrange(item_grouping_f)
     # Convert to matrix format
     armod%<>%arrange(item_grouping_f)%>%dplyr::select(2:3)%>%as.matrix()
@@ -426,7 +527,12 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023){
     }
   }
   
-  warning("You also want the price information here so that stan can calculate the losses in USD")
+  prices<-faostat$price%>%
+    left_join(faostat$item_groups,by=c("Item"))%>%
+    filter(!is.na(item_grouping_f))%>%
+    group_by(ISO3.CODE,item_grouping_f,Year)%>%
+    reframe(Price17eq=mean(Price17eq,na.rm=T))%>%
+    ImputePrices()
   # Generate the list for stan
   fdf<-list(n_t = n_t,
             n_isos = n_isos,
@@ -446,7 +552,9 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023){
             mu_AR1 = mu_AR1,
             sig_AR1 = sig_AR1,
             mu_dis=mu_dis,
-            sig_dis=sig_dis)
+            sig_dis=sig_dis,
+            mu_price=prices$mu_price,
+            sig_price=prices$sig_price)
   # Check through the list!
   fdf%>%Check4Stan()
 }

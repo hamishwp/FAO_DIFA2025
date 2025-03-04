@@ -34,19 +34,31 @@ estimate_gp_params <- function(y_data, time_points, priors=T) {
 
 InitParams<-function(fdf, iprox_dat=T, GPR=F, empAR=F){
   if(empAR) return(function(chainnum){
-    list(gamAR1 = 1,
+    list(beta_dis = 0,
+         beta_dur = 1,
+         hsev = rep(1,fdf$n_haz),
+         isev = rep(1,fdf$n_com),
+         gamAR1 = 1,
          sdAR1 = 1)
   })
   if(!GPR) {
     if(iprox_dat){
       return(function(chainnum){
         list(iprox = fdf$mu_dis,
+             beta_dis = 0,
+             beta_dur = 1,
+             hsev = rep(1,fdf$n_haz),
+             isev = rep(1,fdf$n_com),
              beta_y1 = fdf$mu_AR1,
              sigma = fdf$sig_AR1)
       })
     } else {
       return(function(chainnum){
         list(beta_y1 = fdf$mu_AR1,
+             beta_dis = 0,
+             beta_dur = 1,
+             hsev = rep(1,fdf$n_haz),
+             isev = rep(1,fdf$n_com),
              sigma = fdf$sig_AR1)
       })
     }
@@ -75,6 +87,10 @@ InitParams<-function(fdf, iprox_dat=T, GPR=F, empAR=F){
   if(iprox_dat){
     return(function(chainnum){
       list(iprox = fdf$mu_dis,
+           hsev = rep(1,fdf$n_haz),
+           isev = rep(1,fdf$n_com),
+           beta_dis = 0,
+           beta_dur = 1,
            rho = rho_est,
            alpha = alpha_est,
            beta_y1 = fdf$mu_AR1)
@@ -83,6 +99,10 @@ InitParams<-function(fdf, iprox_dat=T, GPR=F, empAR=F){
     return(function(chainnum){
       list(rho = rho_est,
            alpha = alpha_est,
+           hsev = rep(1,fdf$n_haz),
+           isev = rep(1,fdf$n_com),
+           beta_dis = 0,
+           beta_dur = 1,
            beta_y1 = fdf$mu_AR1)
     })
   }
