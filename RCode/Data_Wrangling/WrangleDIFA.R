@@ -526,13 +526,15 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023){
       if(any(ts<0)|any(tf<0)) stop(paste0("Issues with time variables: check country ",iso," for sevvies row number ",i))
     }
   }
-  
+  # To convert from production to price (USD-2017)
   prices<-faostat$price%>%
     left_join(faostat$item_groups,by=c("Item"))%>%
     filter(!is.na(item_grouping_f))%>%
     group_by(ISO3.CODE,item_grouping_f,Year)%>%
     reframe(Price17eq=mean(Price17eq,na.rm=T))%>%
     ImputePrices()
+  # Weights for the likelihood
+  weights=fdf$sig_AR1/(apply(fdf$y,3,mean)); weights<- 1-(weights/max(weights))
   # Generate the list for stan
   fdf<-list(n_t = n_t,
             n_isos = n_isos,
@@ -553,6 +555,7 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023){
             sig_AR1 = sig_AR1,
             mu_dis=mu_dis,
             sig_dis=sig_dis,
+            weights=weights,
             mu_price=prices$mu_price,
             sig_price=prices$sig_price)
   # Check through the list!

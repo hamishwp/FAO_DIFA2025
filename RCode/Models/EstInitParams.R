@@ -1,3 +1,73 @@
+# Given 
+generate_y <- function(fdf, params) {
+  # Initialize y (output commodity data)
+  outs <- data.frame()
+  # Iterate over countries
+  for (iso in 1:fdf$n_isos) {
+    mu <- numeric(fdf$n_com)  # GPR mean function
+    dsev <- numeric(fdf$n_com)  # Disaster severity per commodity
+    # Iterate over time
+    for (ttt in 1:fdf$n_t) {
+      # Reset disaster severity each year
+      dsev[] <- 0  
+      # Extract flag for disaster impact
+      flag_vec <- fdf$flag[iso, ttt, 1:fdf$n_dis[iso]]
+      # Disaster severity calculation
+      if (sum(flag_vec) > 0) {
+        for (ic in 1:fdf$n_com) {
+          iprox_vec <- exp(fdf$iprox[iso, 1:fdf$n_dis[iso], ic])
+          iphs <- iprox_vec / params$hsev[fdf$htype[iso, 1:fdf$n_dis[iso]]]
+          # calculate the severity
+          dsev[ic] <- sum(flag_vec * (
+              iphs * fdf$hazdur[iso, ttt, 1:fdf$n_dis[iso]] * params$beta_dur +
+                iprox_vec * iphs * (exp(-fdf$ts[iso, ttt, 1:fdf$n_dis[iso]] / iphs) -
+                                      exp(-fdf$tf[iso, ttt, 1:fdf$n_dis[iso]] / iphs))))
+        }
+      }
+      # Compute GPR mean function
+      if (ttt == 1) {
+        mu <- fdf$y[iso, ttt, ]  # Use first-year observed data
+        dsev_mag <- ar_mag <- NA
+      } else {
+        mu <- params$beta_dis * dsev * (1 + params$isev) +
+          params$beta_y1 * fdf$mu_AR1[iso, ] * fdf$y[iso, ttt-1, ]
+        dsev_mag <- (params$beta_dis * dsev * (1 + params$isev))
+        ar_mag <- (params$beta_y1 * fdf$mu_AR1[iso, ] * fdf$y[iso, ttt-1, ])
+      }
+      
+      # Compute adjusted sigma for AR1
+      red_sig <- fdf$sig_AR1[iso, ] * params$sigma
+      
+      outs%<>%rbind(data.frame(time=ttt,com=1:fdf$n_com,ISO3=fdf$isos[iso],
+                               y=mu,
+                               ydiff=(fdf$y[iso, ttt, ] - mu),
+                               sigma=red_sig,
+                               dsev=dsev_mag,
+                               ar=ar_mag))
+    }
+  }
+  
+  outs%>%mutate(yobs=ydiff+y)%>%return()
+}
+
+params <- list(beta_dur = 1,
+               beta_dis = -10000,
+               hsev=rep(1,fdf$n_haz),
+               isev=rep(1,fdf$n_com),
+               beta_y1=rep(1,fdf$n_com),
+               sigma=1)
+outs<-generate_y(fdf,params)
+
+outs%>%group_by(ISO3,com)%>%reframe(meandiff=mean(ydiff,na.rm=T))%>%
+  ggplot()+geom_density(aes(abs(meandiff),colour=as.character(com)))+scale_x_log10()
+
+outs%>%group_by(ISO3,com)%>%reframe(meandiff=mean(dsev-ar,na.rm=T))%>%
+  ggplot()+geom_density(aes(abs(meandiff),colour=as.character(com)))+scale_x_log10()
+
+outs%>%ggplot()+geom_point(aes(y,sigma))+scale_x_log10()+scale_y_log10()+facet_wrap(~com)
+outs%>%ggplot()+geom_point(aes(y,yobs))+scale_x_log10()+scale_y_log10()+geom_abline(slope=1,intercept=0,colour="red")+
+  facet_wrap(~com)
+
 estimate_gp_params <- function(y_data, time_points, priors=T) {
   # Create data frame with time and response variable
   df <- data.frame(time = time_points + runif(length(time_points), 0, 1e-6), y = y_data)
@@ -33,15 +103,39 @@ estimate_gp_params <- function(y_data, time_points, priors=T) {
 }
 
 InitParams<-function(fdf, iprox_dat=T, GPR=F, empAR=F){
-  if(empAR) return(function(chainnum){
-    list(beta_dis = 0,
-         beta_dur = 1,
-         hsev = rep(1,fdf$n_haz),
-         isev = rep(1,fdf$n_com),
-         gamAR1 = 1,
-         sdAR1 = 1)
-  })
+  if(empAR) {
+    # Estimate variance in AR1 residuals
+    y_p <- fdf$y; y_p[]<-0
+    for(i in 1:dim(fdf$y)[1]){
+      for(j in 1:dim(fdf$y)[3]){
+        for(k in 2:dim(fdf$y)[2]){
+          y_p[i,k,j]<-(fdf$y[i,k,j] - fdf$mu_AR1[i,j]*fdf$y[i,k-1,j])/fdf$sig_AR1[i,j]
+        }
+      }
+    }
+    sigres_AR <- sd(c(y_p)[abs(y_p)>1e-6],na.rm = T)
+    
+    return(function(chainnum){
+      list(beta_dis = 0,
+           beta_dur = 1,
+           hsev = rep(1,fdf$n_haz),
+           isev = rep(1,fdf$n_com),
+           gamAR1 = 1,
+           sdAR1 = sigres_AR)
+    })
+  }
   if(!GPR) {
+    # Estimate variance in AR1 residuals
+    y_p <- fdf$y; y_p[]<-0; sigres_AR<-fdf$sig_AR1; sigres_AR[]<-1e-6
+    for(i in 1:dim(fdf$y)[1]){
+      for(j in 1:dim(fdf$y)[3]){
+        for(k in 2:dim(fdf$y)[2]){
+          y_p[i,k,j]<-(fdf$y[i,k,j] - fdf$mu_AR1[i,j]*fdf$y[i,k-1,j])/fdf$sig_AR1[i,j]
+        }
+        sigres_AR[i,j] <- pmax(1e-6,sd(y_p[i,,j],na.rm = T))
+      }
+    }
+    
     if(iprox_dat){
       return(function(chainnum){
         list(iprox = fdf$mu_dis,
@@ -50,7 +144,7 @@ InitParams<-function(fdf, iprox_dat=T, GPR=F, empAR=F){
              hsev = rep(1,fdf$n_haz),
              isev = rep(1,fdf$n_com),
              beta_y1 = fdf$mu_AR1,
-             sigma = fdf$sig_AR1)
+             sigma = sigres_AR)
       })
     } else {
       return(function(chainnum){
@@ -59,7 +153,7 @@ InitParams<-function(fdf, iprox_dat=T, GPR=F, empAR=F){
              beta_dur = 1,
              hsev = rep(1,fdf$n_haz),
              isev = rep(1,fdf$n_com),
-             sigma = fdf$sig_AR1)
+             sigma = sigres_AR)
       })
     }
   }
