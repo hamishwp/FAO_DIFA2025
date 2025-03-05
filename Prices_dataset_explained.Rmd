@@ -1,0 +1,122 @@
+---
+title: "Prices dataset"
+subtitle: "Hamish Patten and Ignacio Acosta"
+output:
+  prettydoc::html_pretty:
+    theme: architect
+    highlight: github
+    css: styles.css
+---
+
+<style type="text/css">
+h1.title {
+  font-size: 50px;
+  color: White;
+}
+h3.subtitle {
+  font-size: 20px;
+  color: White;
+}
+<!-- .table-hover > tbody > tr:hover { -->
+<!--   background-color: #f7f7e6; -->
+<!-- } -->
+.main-container {
+  width: 95%;
+    <!-- max-width: unset; -->
+  }
+</style>
+
+<div style= "position:relative">
+<!-- <div style= "float:left; position:relative; top:-100px;margin-bottom:-100px;margin-left:-10px;"> -->
+
+```{r setup, include=FALSE}
+# Setup the local environment
+source("./RCode/Data_Wrangling/GetFAOSTAT.R")
+
+  library(dplyr)
+  library(magrittr)
+  library(tidyverse)
+  library(readxl)
+  library(ggplot2)
+  library(countrycode)
+  library(stringr)
+  library(pracma)
+  library(data.table)
+  library(FAOSTAT)
+
+# Some extras for nice and neat tables
+knitr::opts_chunk$set(echo = TRUE)
+options(kableExtra.latex.load_packages = FALSE,
+        knitr.kable.NA = '')
+
+
+FAOSTAT <- GetFAOSTAT_All(syear = 1990,fyear = 2024)
+Production <- FAOSTAT$Prod
+Prices <- FAOSTAT$price
+```
+
+</div>
+
+## Prices dataset
+
+The **FAOSTAT Producer Prices dataset** gather information related to prices received by farmers for primary crops, live animals and livestock primary products as collected at the point of initial sale (prices paid at the farm-gate). 
+
+- Annual data are provided from 1991.
+
+The variable of interest for our report is **USD/Tonne** which is then converted to **2017 USD/Tonne**.
+
+The dataset contains price observation for the Country-Year-Item combination.
+
+Example: Producer price (measured in 2017 USD/Tonne) of strawberries in Uruguay for the year 2014.
+
+## Work until now
+
+In previous report, the work flow was the following:
+
+1) Production losses were estimated, therefore, we got a dataset containing the variables Country-Year-Item-Production_loss.
+
+2) We left-join the prices dataset.
+
+Here, some **NA's** were created.
+
+### How part of NA's were handled:
+
+Subregional, regional and world **MEAN** prices were computed at an **ITEM - Year** level.
+
+Ex: The imputation dataset contains the mean price of strawberries at the subregional, regional, and world levels for each year.
+
+Then, if a country had an NA in price, it was imputed using the smallest available level of dissagregation.
+
+# Prices dataset descriptives
+
+Items which are present in Production dataset but not in Prices dataset:
+
+```{r, message=FALSE,warning=FALSE, echo=FALSE}
+Production%>%
+  group_by(
+    Item
+  )%>%
+  summarise(
+      n = n(),
+      Production = sum(Production,na.rm=TRUE)
+      )%>%
+  anti_join(
+    Prices%>%
+      group_by(
+        Item
+      )%>%
+      count(
+      )
+      ,
+      by = "Item"
+  )%>%
+  arrange(desc(Production))%>%
+kableExtra::kable(
+  col.names = c(
+    "Item",
+    "n",
+    "Production"
+    )
+  )
+```
+There are 79 Item which will have NA after imputation.
