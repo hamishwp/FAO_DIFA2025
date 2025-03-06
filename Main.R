@@ -18,7 +18,7 @@ methody <- "MCMC"
 source("./RCode/Setup/GetPackages.R")
 source("./RCode/Setup/Functions.R")
 # Which STAN model to use?
-stan_model_code <- "./RCode/Models/DIFA2025_redredDisSev_empAR_V3.stan" 
+stan_model_code <- "./RCode/Models/DIFA2025_log_samAR_repr_V1.stan" 
 iprox_dat <- ifelse(grepl("redDisSev",stan_model_code),F,T); GPR <- ifelse(!(grepl("noGPR",stan_model_code) | grepl("empAR",stan_model_code)),T,F); empAR <- ifelse(grepl("empAR",stan_model_code),T,F)
 # Save all files with this time-dependent extension
 save_str<-paste0("_",str_replace_all(str_replace_all(Sys.time()," ","_"),":",""))

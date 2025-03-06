@@ -1,4 +1,4 @@
-# Given 
+# Given a set of model parameters, calculate different elements of the likelihood
 generate_y <- function(fdf, params) {
   # Initialize y (output commodity data)
   outs <- data.frame()
@@ -6,43 +6,61 @@ generate_y <- function(fdf, params) {
   for (iso in 1:fdf$n_isos) {
     mu <- numeric(fdf$n_com)  # GPR mean function
     dsev <- numeric(fdf$n_com)  # Disaster severity per commodity
+    dsevhaz <- numeric(fdf$n_com)  # Disaster severity per commodity
+    dsevimp <- numeric(fdf$n_com)  # Disaster severity per commodity
     # Iterate over time
     for (ttt in 1:fdf$n_t) {
       # Reset disaster severity each year
-      dsev[] <- 0  
+      dsev[] <- dsevhaz[] <- dsevimp[] <- 0  
       # Extract flag for disaster impact
       flag_vec <- fdf$flag[iso, ttt, 1:fdf$n_dis[iso]]
       # Disaster severity calculation
       if (sum(flag_vec) > 0) {
         for (ic in 1:fdf$n_com) {
-          iprox_vec <- exp(fdf$iprox[iso, 1:fdf$n_dis[iso], ic])
-          iphs <- iprox_vec / params$hsev[fdf$htype[iso, 1:fdf$n_dis[iso]]]
+          hs <- params$hsev[fdf$htype[iso, 1:fdf$n_dis[iso]]]
+          iproxhs <- fdf$iprox[iso, 1:fdf$n_dis[iso], ic] / hs
           # calculate the severity
-          dsev[ic] <- sum(flag_vec * (
-              iphs * fdf$hazdur[iso, ttt, 1:fdf$n_dis[iso]] * params$beta_dur +
-                iprox_vec * iphs * (exp(-fdf$ts[iso, ttt, 1:fdf$n_dis[iso]] / iphs) -
-                                      exp(-fdf$tf[iso, ttt, 1:fdf$n_dis[iso]] / iphs))))
+          dsev[ic] <- sum(flag_vec * iproxhs * (
+            hs * fdf$hazdur[iso, ttt, 1:fdf$n_dis[iso]] * params$beta_dur +
+              exp(-fdf$ts[iso, ttt, 1:fdf$n_dis[iso]] / hs) -
+                                    exp(-fdf$tf[iso, ttt, 1:fdf$n_dis[iso]] / hs)))
+          # Only the hazard part of the severity
+          dsevhaz[ic] <- sum(flag_vec * iproxhs * (
+            hs * fdf$hazdur[iso, ttt, 1:fdf$n_dis[iso]] * params$beta_dur))
+          # Only the impact decay part of the severity
+          dsevimp[ic] <- sum(flag_vec * iproxhs * (
+              exp(-fdf$ts[iso, ttt, 1:fdf$n_dis[iso]] / hs) -
+              exp(-fdf$tf[iso, ttt, 1:fdf$n_dis[iso]] / hs)))
+          # iprox_vec <- exp(fdf$iprox[iso, 1:fdf$n_dis[iso], ic])
+          # iphs <- iprox_vec / params$hsev[fdf$htype[iso, 1:fdf$n_dis[iso]]]
+          # # calculate the severity
+          # dsev[ic] <- sum(flag_vec * (
+          #     iphs * fdf$hazdur[iso, ttt, 1:fdf$n_dis[iso]] * params$beta_dur +
+          #       iprox_vec * iphs * (exp(-fdf$ts[iso, ttt, 1:fdf$n_dis[iso]] / iphs) -
+          #                             exp(-fdf$tf[iso, ttt, 1:fdf$n_dis[iso]] / iphs))))
         }
       }
       # Compute GPR mean function
       if (ttt == 1) {
-        mu <- fdf$y[iso, ttt, ]  # Use first-year observed data
+        mu <- log(10+fdf$y[iso, ttt, ])  # Use first-year observed data
         dsev_mag <- ar_mag <- NA
       } else {
-        mu <- params$beta_dis * dsev * (1 + params$isev) +
-          params$beta_y1 * fdf$mu_AR1[iso, ] * fdf$y[iso, ttt-1, ]
-        dsev_mag <- (params$beta_dis * dsev * (1 + params$isev))
-        ar_mag <- (params$beta_y1 * fdf$mu_AR1[iso, ] * fdf$y[iso, ttt-1, ])
+        mu <- params$beta_dis * dsev * params$isev +
+          params$beta_y1 * fdf$lnmu_AR1[iso, ] * log(10+fdf$y[iso, ttt-1, ])
+        dsev_mag <- params$beta_dis * dsev * params$isev
+        ar_mag <- params$beta_y1 * fdf$lnmu_AR1[iso, ] * log(10+fdf$y[iso, ttt-1, ])
       }
       
       # Compute adjusted sigma for AR1
-      red_sig <- fdf$sig_AR1[iso, ] * params$sigma
+      red_sig <- fdf$lnsig_AR1[iso, ] * params$sigma
       
       outs%<>%rbind(data.frame(time=ttt,com=1:fdf$n_com,ISO3=fdf$isos[iso],
                                y=mu,
-                               ydiff=(fdf$y[iso, ttt, ] - mu),
+                               ydiff=(log(10+fdf$y[iso, ttt, ]) - mu),
                                sigma=red_sig,
                                dsev=dsev_mag,
+                               dsevimp=dsevimp,
+                               dsevhaz=dsevhaz,
                                ar=ar_mag))
     }
   }
@@ -51,15 +69,23 @@ generate_y <- function(fdf, params) {
 }
 
 # params <- list(beta_dur = 1,
-#                beta_dis = -10000,
+#                beta_dis = -1e-1,
 #                hsev=rep(1,fdf$n_haz),
 #                isev=rep(1,fdf$n_com),
 #                beta_y1=rep(1,fdf$n_com),
 #                sigma=1)
 # outs<-generate_y(fdf,params)
 # 
-# outs%>%group_by(ISO3,com)%>%reframe(meandiff=mean(ydiff,na.rm=T))%>%
+# outs%>%group_by(ISO3,com)%>%reframe(meandiff=mean(abs(ydiff),na.rm=T))%>%
 #   ggplot()+geom_density(aes(abs(meandiff),colour=as.character(com)))+scale_x_log10()
+# 
+# range(outs$dsevhaz)
+# range(outs$dsevimp)
+# outs%>%
+#   ggplot()+geom_point(aes(dsevhaz+1,dsevimp+1,colour=as.character(com)))+
+#   scale_x_log10()+facet_wrap(~com)
+# 
+# outs%>%group_by(ISO3,com)%>%reframe(dsev=mean(dsev,na.rm=T),ar=mean(ar,na.rm=T))%>%group_by(com)%>%reframe(dsev=mean(dsev,na.rm=T),ar=mean(ar,na.rm=T))
 # 
 # outs%>%group_by(ISO3,com)%>%reframe(meandiff=mean(dsev-ar,na.rm=T))%>%
 #   ggplot()+geom_density(aes(abs(meandiff),colour=as.character(com)))+scale_x_log10()
@@ -67,6 +93,39 @@ generate_y <- function(fdf, params) {
 # outs%>%ggplot()+geom_point(aes(y,sigma))+scale_x_log10()+scale_y_log10()+facet_wrap(~com)
 # outs%>%ggplot()+geom_point(aes(y,yobs))+scale_x_log10()+scale_y_log10()+geom_abline(slope=1,intercept=0,colour="red")+
 #   facet_wrap(~com)
+
+# Calculate the model likelihood
+m_likelihood <- function(fdf, params) {
+  # Initialise log-likelihood
+  loglk<-0
+  # Iterate over countries
+  for (iso in 1:fdf$n_isos) {
+    # Iterate over time
+    for (ttt in 1:fdf$n_t) {
+      # Extract flag for disaster impact
+      flag_vec <- fdf$flag[iso, ttt, 1:fdf$n_dis[iso]]
+      # Disaster severity calculation
+      if (sum(flag_vec) > 0) {
+        hs <- params$hsev[fdf$htype[iso, 1:fdf$n_dis[iso]]]
+        # calculate the severity
+        dsev <- apply(flag_vec * fdf$iprox[iso, 1:fdf$n_dis[iso], ] / hs * (
+          hs * fdf$hazdur[iso, ttt, 1:fdf$n_dis[iso]] * params$beta_dur +
+            exp(-fdf$ts[iso, ttt, 1:fdf$n_dis[iso]] / hs) -
+            exp(-fdf$tf[iso, ttt, 1:fdf$n_dis[iso]] / hs)),2,sum)
+      } else dsev <-rep(0,fdf$n_com)
+      # Compute GPR mean function
+      mu <- params$beta_dis * dsev * params$isev +
+        params$beta_y1 * fdf$lnmu_AR1[iso, ] * log(10+fdf$y[iso, ttt-1, ])
+      # Compute adjusted sigma for AR1
+      red_sig <- fdf$lnsig_AR1[iso, ] * params$sigma
+      # Log-likelihood
+      loglk<-loglk+pnorm(log(10+fdf$y[iso, ttt, ]),
+                         mu,red_sig,log.p = T)
+    }
+  }
+  
+  return(loglk)
+}
 
 estimate_gp_params <- function(y_data, time_points, priors=T) {
   # Create data frame with time and response variable
@@ -103,6 +162,29 @@ estimate_gp_params <- function(y_data, time_points, priors=T) {
 }
 
 InitParams<-function(fdf, iprox_dat=T, GPR=F, empAR=F){
+  
+  warning("FUMBLING INITIAL VALUES FOR NOW")
+  
+  return(function(chainnum){
+    list(beta_dis = 0,
+         beta_dur = 1,
+         hsev = rep(1,fdf$n_haz),
+         isev = rep(1,fdf$n_com),
+         gamAR1 = 1,
+         sdAR1 = 1)
+  })
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   if(empAR) {
     # Estimate variance in AR1 residuals
     y_p <- fdf$y; y_p[]<-0
