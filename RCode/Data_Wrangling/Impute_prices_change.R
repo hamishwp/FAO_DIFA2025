@@ -168,10 +168,6 @@ Complete_Prices <- function(Prices, Prod, FAOSTAT_Item) {
 }
 }
 
-Prices <- prices
-Prod = faostat$Prod%>%filter(Year >= 1991)
-FAOSTAT_Item = faostat$item_groups
-
 prices2 <- prices%>%
   Complete_Prices(
     Prod = faostat$Prod%>%filter(Year >= 1991), 
