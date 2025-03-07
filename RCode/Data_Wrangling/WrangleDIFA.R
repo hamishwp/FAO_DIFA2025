@@ -531,8 +531,9 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023){
     left_join(faostat$item_groups,by=c("Item"))%>%
     filter(!is.na(item_grouping_f))%>%
     group_by(ISO3.CODE,item_grouping_f,Year)%>%
-    reframe(Price17eq=mean(Price17eq,na.rm=T))%>%
+    reframe(Price17eq=mean(x=Price17eq,na.rm=T))%>%
     ImputePrices()
+  
   # Weights for the likelihood
   weights=sig_AR1/(apply(y,3,mean)); weights<- 1-(weights/max(weights))
   # Generate the list for stan
