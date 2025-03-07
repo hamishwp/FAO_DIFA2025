@@ -304,19 +304,23 @@ Check4Stan<-function(fdf){
     warning("CORRECTING! Stan data input check: negative sig_dis values, setting to 1e-6")
     fdf$sig_dis[fdf$sig_dis<0]<-1e-6
   }
-  if(any(fdf$mu_AR1<0)){
-    warning("CORRECTING! Stan data input check: negative mu_AR1 values, setting to zero")
-    fdf$mu_AR1[fdf$mu_AR1<0]<-0
+  if(any(fdf$mu_AR1<1e-6)){
+    warning("CORRECTING! Stan data input check: zero mu_AR1 values, setting to 1e-6")
+    fdf$mu_AR1[fdf$mu_AR1<1e-6]<-1e-6
   }
-  if(any(fdf$sig_AR1<0)){
-    warning("CORRECTING! Stan data input check: negative sig_AR1 values, setting to 1e-6")
-    fdf$sig_AR1[fdf$sig_AR1<0]<-1e-6
+  if(any(fdf$sig_AR1<1e-6)){
+    warning("CORRECTING! Stan data input check: zero sig_AR1 values, setting to 1e-6")
+    fdf$sig_AR1[fdf$sig_AR1<1e-6]<-1e-6
+  }
+  if(any(fdf$lnsig_AR1<1e-6)){
+    warning("CORRECTING! Stan data input check: zero log(sig_AR1) values, setting to log(1e-6)")
+    fdf$lnsig_AR1[fdf$lnsig_AR1<1e-6]<- 1e-6
   }
   return(fdf)
 }
 
 # Once disaster severity has been predicted, generate all the data we need 
-Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023){
+Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023, loggy=T){
   # Some dimensions
   n_t <- fyear-syear+1L        # Number of years
   n_dis <- 30 # number of disasters per country
@@ -406,11 +410,14 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023){
   # AR1-related variables
   mu_AR1 <- array(0, dim = c(n_isos, n_com)) 
   sig_AR1 <- array(0, dim = c(n_isos, n_com)) 
+  lnmu_AR1 <- array(0, dim = c(n_isos, n_com)) 
+  lnsig_AR1 <- array(0, dim = c(n_isos, n_com)) 
   # Disaster severity sampling (replaces iprox)
   mu_dis <- array(0, dim = c(n_isos, n_dis, n_com)) 
   sig_dis <- array(0, dim = c(n_isos, n_dis, n_com)) 
   # Commodity data
   y <- array(0, dim = c(n_isos, n_t, n_com)) 
+  lndiffy <- array(NA, dim = c(n_isos, n_t, n_com)) 
   # Create an array of the number of disasters per country
   n_dis_v<-integer(n_t)
   # Which commodities are we covering?
@@ -422,14 +429,14 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023){
     for(t in time){
       # All-year commodities data
       y[j,t, ] <- pull(arrange(prod[prod$ISO3.CODE==is & prod$Year==yrs[t],],item_grouping_f),Prod)
+      if(t!=1) lndiffy[j,t,]<-log(10+y[j,t,])/log(10+y[j,t-1,])
     }
     # Filter only the relevant disaster severity records
     isosev<-redsev%>%filter(ISO3==is)
     # Compute AR(1) estimates with pre-filled zeros
     armod <- prod %>% filter(ISO3.CODE == is) %>% group_by(item_grouping_f) %>%
       reframe(AR1 = ifelse(n() > 1, Rfast::ar1(Prod)[["phi"]], 0),  # If only one value, return 0 for AR1
-              # sigAR1 = ifelse(n() > 1, max(sd(Prod,na.rm = T),1e-6,na.rm = T), 1e-6))%>%  # If only one value, return very small value
-              sigAR1 = ifelse(n() > 1, max(Rfast::ar1(Prod)[["sigma"]],1e-6,na.rm = T), 1e-6))%>%  # If only one value, return very small value
+              sigAR1 = ifelse(n() > 1, max(sd(Prod,na.rm = T),1e-6,na.rm = T), 1e-6))%>%  # and on log-scale for the log-model
       right_join(data.frame(item_grouping_f = commods), by = "item_grouping_f") %>%
       mutate(AR1 = replace_na(AR1, 0), # Replace NA in AR1 with 0
              sigAR1 = replace_na(sigAR1, 1e-6))%>% # Replace NA in sigAR1 with really small but non-zero value
@@ -439,6 +446,10 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023){
     # Store it
     mu_AR1[j,] <- armod[,1]
     sig_AR1[j,] <- armod[,2]
+    for(k in 1:length(commods)){
+      lnmu_AR1[j,k] <- mean(lndiffy[j,,k],na.rm = T)
+      lnsig_AR1[j,k] <- pmax(1e-6,sd(log(10+y[j,,k]),na.rm = T))
+    }
     # if no disasters are present in this country, add empty values
     if(nrow(isosev)!=0){
       # This vector helps speed up the calculations in the stan model
@@ -544,7 +555,8 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023){
             n_com = n_com,
             time = time,
             isos = isos,
-            y = y,  
+            y = y,
+            lny = log(10+y),
             flag = flag,
             ts = ts,
             tf = tf,
@@ -554,6 +566,8 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023){
             iprox = iprox,
             mu_AR1 = mu_AR1,
             sig_AR1 = sig_AR1,
+            lnmu_AR1 = lnmu_AR1,
+            lnsig_AR1 = lnsig_AR1,
             mu_dis=mu_dis,
             sig_dis=sig_dis,
             weights=weights,
