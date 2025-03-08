@@ -84,7 +84,7 @@ model {
           // Save on computation  
           iproxhs = to_vector(iprox[iso, 1:n_dis[iso], ic]) ./ hs;
           // Calculate the disaster severity
-          dsev[ic] = sum(flag_vec.*iproxhs.*(
+          dsev[ic] = sum(flag_vec.*iproxhs.*
             hs.*to_vector(hazdur[iso, ttt, 1:n_dis[iso]])*beta_dur +
             exp(-to_vector(ts[iso,ttt, 1:n_dis[iso]]).*hs) -
             exp(-to_vector(tf[iso,ttt, 1:n_dis[iso]]).*hs)));

@@ -11,14 +11,14 @@ fyear=2023
 # Do we want to use the Desinventar data to infer disaster severity? If not, use EM-DAT multivariate model
 Desinventar<-T
 # MCMC hyperparameters
-hyppars<-list(chains=8,iter=3000,burnin=1000,adapt=0.95,maxtree=30)
+hyppars<-list(chains=8,iter=5000,burnin=1500,adapt=0.95,maxtree=30)
 # Methodology to parameterise the model (can be 'MCMC', 'Optim' or 'VI'):
-methody <- "MCMC"
+methody <- "MCMLE"
 # Load the packages & default functions
 source("./RCode/Setup/GetPackages.R")
 source("./RCode/Setup/Functions.R")
 # Which STAN model to use?
-stan_model_code <- "./RCode/Models/DIFA2025_log_samAR_repr_V1.stan" 
+stan_model_code <- "./RCode/Models/DIFA2025_log_samAR_V1.stan" 
 iprox_dat <- ifelse(grepl("redDisSev",stan_model_code),F,T); GPR <- ifelse(!(grepl("noGPR",stan_model_code) | grepl("empAR",stan_model_code)),T,F); empAR <- ifelse(grepl("empAR",stan_model_code),T,F)
 # Save all files with this time-dependent extension
 save_str<-paste0("_",str_replace_all(str_replace_all(Sys.time()," ","_"),":",""))
