@@ -122,7 +122,110 @@ TrainModel_MCMLE <- function(fdf, samp = 5000, cpus = 30, LL="m_likelihood"){
   }))
 }
 
-
+# Restructuring the MCMLE results into one dataframe and then calculating summaries of the different parameter samples
+compute_weighted_stats <- function(mcmle, negdis=F) {
+  # Ensure LL exists in dataframe
+  if (!"LL" %in% colnames(mcmle)) {
+    stop("Column 'LL' not found in the dataframe.")
+  }
+  
+  # **1. Compute statistics for all numeric columns**
+  numeric_vars <- colnames(mcmle)[sapply(mcmle, is.numeric) & 
+                                    colnames(mcmle) != "LL" & 
+                                    colnames(mcmle) != "beta_dis"]
+  
+  # Filter high LL values (upper quartile)
+  mcmle_filtered <- mcmle %>%
+    filter(LL > quantile(LL, 0.75)) %>%  # Keep top 25% of samples
+    mutate(
+      redLL = log(LL - min(LL) + 1e-6),  # Log-scale LL
+      weights = redLL / sum(redLL)  # Normalize weights
+    )
+  
+  results <- lapply(numeric_vars, function(var) {
+    w_mean <- weighted.mean(log(mcmle_filtered[[var]]), mcmle_filtered$weights)
+    w_quartiles <- weighted_quantile(log(mcmle_filtered[[var]]), mcmle_filtered$weights, c(0.05, 0.25, 0.5, 0.75, 0.95))
+    
+    data.frame(
+      variable = var,
+      w_mean = w_mean,
+      w_q05 = w_quartiles[1],
+      w_q25 = w_quartiles[2],
+      w_q50 = w_quartiles[3],
+      w_q75 = w_quartiles[4],
+      w_q95 = w_quartiles[5]
+    )
+  })
+  
+  if(negdis) {
+    mcmle_filtered%<>%mutate(beta_dis = -1*beta_dis)
+    
+    w_mean <- weighted.mean(log(mcmle_filtered$beta_dis), mcmle_filtered$weights)
+    w_quartiles <- weighted_quantile(log(mcmle_filtered$beta_dis), mcmle_filtered$weights, c(0.05, 0.25, 0.5, 0.75, 0.95))
+    
+    results%<>%rbind(data.frame(
+      variable = "beta_dis",
+      w_mean = w_mean,
+      w_q05 = w_quartiles[1],
+      w_q25 = w_quartiles[2],
+      w_q50 = w_quartiles[3],
+      w_q75 = w_quartiles[4],
+      w_q95 = w_quartiles[5]
+    ))
+  } else {
+    w_mean <- weighted.mean(mcmle_filtered$beta_dis, mcmle_filtered$weights)
+    w_quartiles <- weighted_quantile(mcmle_filtered$beta_dis, mcmle_filtered$weights, c(0.05, 0.25, 0.5, 0.75, 0.95))
+    
+    results%<>%rbind(data.frame(
+      variable = "beta_dis",
+      w_mean = w_mean,
+      w_q05 = w_quartiles[1],
+      w_q25 = w_quartiles[2],
+      w_q50 = w_quartiles[3],
+      w_q75 = w_quartiles[4],
+      w_q95 = w_quartiles[5]
+    ))
+  }
+  
+  # **2. Handle `hsev` and `isev` separately (long format)**
+  # **2. Expand `hsev` and `isev` into separate variables**
+  # Extract max length of hsev and isev (assuming all rows have the same length)
+  max_hsev_length <- max(sapply(mcmle$hsev, length))
+  max_isev_length <- max(sapply(mcmle$isev, length))
+  
+  # Create named columns for hsev[i] and isev[i]
+  mcmle_expanded <- mcmle_filtered %>%
+    mutate(hsev = lapply(hsev, function(x) { length(x) <- max_hsev_length; x }),  # Pad missing elements with NA
+           isev = lapply(isev, function(x) { length(x) <- max_isev_length; x })) %>%
+    unnest_wider(hsev, names_sep = "_") %>%
+    unnest_wider(isev, names_sep = "_")
+  
+  # Compute weighted statistics for each hsev[i] and isev[i]
+  hsev_isev_results <- lapply(names(mcmle_expanded)[grepl("^hsev_|^isev_", names(mcmle_expanded))], function(var) {
+    w_mean <- weighted.mean(log(mcmle_expanded[[var]]), mcmle_expanded$weights, na.rm = TRUE)
+    w_quartiles <- weighted_quantile(log(mcmle_expanded[[var]]), mcmle_expanded$weights, c(0.05, 0.25, 0.5, 0.75, 0.95))
+    
+    data.frame(
+      variable = gsub("_", "[", var) %>% gsub("$", "]", .),  # Convert hsev_1 to hsev[1]
+      w_mean = w_mean,
+      w_q05 = w_quartiles[1],
+      w_q25 = w_quartiles[2],
+      w_q50 = w_quartiles[3],
+      w_q75 = w_quartiles[4],
+      w_q95 = w_quartiles[5]
+    )
+  })
+  
+  # **3. Combine all results into a single dataframe**
+  results_df <- bind_rows(bind_rows(results), bind_rows(hsev_isev_results))
+  
+  results_df%<>%mutate_at(colnames(results_df)[-1],exp)
+  if(negdis) {
+    results_df[results_df$variable=="beta_dis",2:ncol(results_df)]<- -1*results_df[results_df$variable=="beta_dis",2:ncol(results_df)]
+  } else results_df[results_df$variable=="beta_dis",]<-log(results_df[results_df$variable=="beta_dis",])
+  
+  return(results_df)
+}
 
 
 

@@ -18,6 +18,15 @@ compute_cumulative_means <- function(mcmle, var_name, loggy=F) {
   return(mcmle)
 }
 
+# Weighted quantiles
+weighted_quantile <- function(x, w, probs) {
+  order_idx <- order(x)
+  x_sorted <- x[order_idx]
+  w_sorted <- w[order_idx]
+  w_cum <- cumsum(w_sorted) / sum(w_sorted)
+  approx(w_cum, x_sorted, xout = probs, rule = 2)$y
+}
+
 returnX<-function(x,a=NULL,b=NULL) x
 negexp <-function(x) -exp(x)
 logneg <-function(x) log(-x)

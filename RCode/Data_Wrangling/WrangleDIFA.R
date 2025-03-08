@@ -134,6 +134,7 @@ AddProdArea<-function(fdf,faostat){
   tab <- xtabs(sumarea ~ ISO3.CODE + Year + item_grouping_f, data = sumarea)
   # Add area to the final DIFA dataframe
   fdf$area <- array(tab, dim = dim(tab), dimnames = dimnames(tab))
+  fdf$area[fdf$area<1e-3]<-1e-3
   
   return(fdf)
 }
@@ -439,12 +440,16 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023, loggy=T){
   sig_AR1 <- array(0, dim = c(n_isos, n_com)) 
   lnmu_AR1 <- array(0, dim = c(n_isos, n_com)) 
   lnsig_AR1 <- array(0, dim = c(n_isos, n_com)) 
+  mu_AR1_yield <- array(0, dim = c(n_isos, n_com)) 
+  sig_AR1_yield <- array(0, dim = c(n_isos, n_com)) 
   # Disaster severity sampling (replaces iprox)
   mu_dis <- array(0, dim = c(n_isos, n_dis, n_com)) 
   sig_dis <- array(0, dim = c(n_isos, n_dis, n_com)) 
   # Commodity data
   y <- array(0, dim = c(n_isos, n_t, n_com)) 
   lndiffy <- array(NA, dim = c(n_isos, n_t, n_com)) 
+  # Add the area data
+  area <- AddProdArea(fdf,faostat)
   # Create an array of the number of disasters per country
   n_dis_v<-integer(n_t)
   # Which commodities are we covering?
@@ -476,6 +481,8 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023, loggy=T){
     for(k in 1:length(commods)){
       lnmu_AR1[j,k] <- mean(lndiffy[j,,k],na.rm = T)
       lnsig_AR1[j,k] <- pmax(1e-6,sd(log(10+y[j,,k]),na.rm = T))
+      mu_AR1_yield[j,k] <- mean(((y[j,2:n_t,k]/area[j,2:fdf$n_t,k])/(y[j,1:(n_t-1),k]/area[j,1:(fdf$n_t-1),k])),na.rm = T)
+      sig_AR1_yield[j,k] <- pmax(1e-6,sd(y[j,,k]/area[j,,k],na.rm = T))
     }
     # if no disasters are present in this country, add empty values
     if(nrow(isosev)!=0){
@@ -571,8 +578,6 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023, loggy=T){
     group_by(ISO3.CODE,item_grouping_f,Year)%>%
     reframe(Price17eq=mean(x=Price17eq,na.rm=T))%>%
     ImputePrices()
-  # Add the area data
-  area <- AddProdArea(fdf,faostat)
   # Weights for the likelihood
   weights=sig_AR1/(apply(y,3,mean)); weights<- 1-(weights/max(weights))
   # Generate the list for stan
@@ -586,6 +591,7 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023, loggy=T){
             y = y,
             lny = log(10+y),
             area=area,
+            yield=y/area,
             flag = flag,
             ts = ts,
             tf = tf,
@@ -597,6 +603,8 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023, loggy=T){
             sig_AR1 = sig_AR1,
             lnmu_AR1 = lnmu_AR1,
             lnsig_AR1 = lnsig_AR1,
+            mu_AR1_yield=mu_AR1_yield,
+            sig_AR1_yield=sig_AR1_yield,
             mu_dis=mu_dis,
             sig_dis=sig_dis,
             weights=weights,
