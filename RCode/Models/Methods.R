@@ -77,8 +77,10 @@ TrainModel_VI <- function(fdf, model) {
 # Reduce the fdf datalist to only the variables we need 
 redFdF <- function(fdf) {
   # Identify all `fdf$` elements used in the function
-  fdf_vars <- c("n_isos", "n_t", "n_dis", "n_com", "n_haz", "flag", "htype", "iprox", 
-                "hazdur", "ts", "tf", "lnmu_AR1", "lnsig_AR1", "lny")
+  fdf_vars <- c("n_isos", "n_t", "n_dis", "n_com", "n_haz", 
+                "flag", "htype", "iprox", "hazdur", "ts", "tf", 
+                "lnmu_AR1", "lnsig_AR1", "mu_AR1", "sig_AR1", 
+                "y", "lny", "area")
   # Keep only the required elements in fdf
   fdf[names(fdf) %in% fdf_vars]
 }
@@ -95,7 +97,7 @@ TrainModel_MCMLE <- function(fdf, samp = 5000, cpus = 30, LL="m_likelihood"){
     beta_dur = rgamma(1, shape = 1, rate = 1),  # Hazard duration coefficient
     isev = rgamma(fdf$n_com, shape = 1, rate = 1),  # Commodity severity (vector)
     sigma = rgamma(1, shape = 2, rate = 2),  # Standard deviation in AR1 model
-    beta_y1 = rgamma(1, shape = 2, rate = 2),  # Gamma coefficient in AR1 model
+    beta_y1 = rgamma(1, shape = 2, rate = 2)  # Gamma coefficient in AR1 model
   ))
   
   # Run parallel computation

@@ -111,6 +111,33 @@ ConvHe2Tonnes<-function(sevvies,faostat){
     dplyr::select(-any_of(c("avyield","propprod","proportion")))
 }
 
+AddProdArea<-function(fdf,faostat){
+  # Total productive area in hectares, per country, per item group, per year
+  sumarea<-faostat$Area%>%dplyr::select(-any_of(c("item_grouping_f")))%>%
+    left_join(faostat$item_groups,by=c("Item"))%>%
+    filter(!is.na(item_grouping_f) & Year>=syear & Year<=fyear)%>%
+    group_by(ISO3.CODE,item_grouping_f,Year)%>%
+    reframe(sumarea=sum(Value,na.rm = T))
+  # Add the meat-related area by dividing the meat production by meat yield...
+  meat_yield<-faostat$yield%>%dplyr::select(-any_of(c("item_grouping_f")))%>%
+    left_join(faostat$item_groups,by=c("Item"))%>%
+    filter(item_grouping_f=="Meat")%>%
+    left_join(faostat$Prod%>%dplyr::select(any_of(c("ISO3.CODE","Year","Item","Production"))),
+              by=c("ISO3.CODE","Year","Item"),relationship="many-to-many")%>%
+    mutate(Area=Production/Yield)%>%
+    group_by(ISO3.CODE,Year,item_grouping_f)%>%
+    reframe(sumarea=sum(Area,na.rm = T))%>%
+    filter(Year>=syear & Year<=fyear)
+  # Add to the total productive area dataframe
+  sumarea%<>%rbind(meat_yield)
+  # Create a contingency table
+  tab <- xtabs(sumarea ~ ISO3.CODE + Year + item_grouping_f, data = sumarea)
+  # Add area to the final DIFA dataframe
+  fdf$area <- array(tab, dim = dim(tab), dimnames = dimnames(tab))
+  
+  return(fdf)
+}
+
 # Function to perform 5-fold cross-validation for spline uncertainty estimation
 crossval_prices <- function(years, prices, prediction_years, folds = 5, method="spline") {
   n <- length(years)
@@ -544,7 +571,8 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023, loggy=T){
     group_by(ISO3.CODE,item_grouping_f,Year)%>%
     reframe(Price17eq=mean(x=Price17eq,na.rm=T))%>%
     ImputePrices()
-  
+  # Add the area data
+  area <- AddProdArea(fdf,faostat)
   # Weights for the likelihood
   weights=sig_AR1/(apply(y,3,mean)); weights<- 1-(weights/max(weights))
   # Generate the list for stan
@@ -557,6 +585,7 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023, loggy=T){
             isos = isos,
             y = y,
             lny = log(10+y),
+            area=area,
             flag = flag,
             ts = ts,
             tf = tf,

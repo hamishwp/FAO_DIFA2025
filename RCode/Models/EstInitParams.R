@@ -75,24 +75,6 @@ generate_y <- function(fdf, params) {
 #                beta_y1=rep(1,fdf$n_com),
 #                sigma=1)
 # outs<-generate_y(fdf,params)
-# 
-# outs%>%group_by(ISO3,com)%>%reframe(meandiff=mean(abs(ydiff),na.rm=T))%>%
-#   ggplot()+geom_density(aes(abs(meandiff),colour=as.character(com)))+scale_x_log10()
-# 
-# range(outs$dsevhaz)
-# range(outs$dsevimp)
-# outs%>%
-#   ggplot()+geom_point(aes(dsevhaz+1,dsevimp+1,colour=as.character(com)))+
-#   scale_x_log10()+facet_wrap(~com)
-# 
-# outs%>%group_by(ISO3,com)%>%reframe(dsev=mean(dsev,na.rm=T),ar=mean(ar,na.rm=T))%>%group_by(com)%>%reframe(dsev=mean(dsev,na.rm=T),ar=mean(ar,na.rm=T))
-# 
-# outs%>%group_by(ISO3,com)%>%reframe(meandiff=mean(dsev-ar,na.rm=T))%>%
-#   ggplot()+geom_density(aes(abs(meandiff),colour=as.character(com)))+scale_x_log10()
-# 
-# outs%>%ggplot()+geom_point(aes(y,sigma))+scale_x_log10()+scale_y_log10()+facet_wrap(~com)
-# outs%>%ggplot()+geom_point(aes(y,yobs))+scale_x_log10()+scale_y_log10()+geom_abline(slope=1,intercept=0,colour="red")+
-#   facet_wrap(~com)
 
 # Calculate the model likelihood
 m_likelihood <- function(fdf, params) {
@@ -132,6 +114,43 @@ m_likelihood <- function(fdf, params) {
   return(loglk)
 }
 
+# Calculate the model likelihood
+m_likelihood_nology <- function(fdf, params) {
+  # Initialise log-likelihood
+  loglk<-0
+  # Iterate over countries
+  for (iso in 1:fdf$n_isos) {
+    # Save on computation
+    hs <- params$hsev[fdf$htype[iso, 1:fdf$n_dis[iso]]]
+    iproxhs <- fdf$iprox[iso, 1:fdf$n_dis[iso], ] / hs
+    if(fdf$n_dis[iso] == 1) iproxhs%<>%matrix(nrow=1)
+    mu_AR1 <- fdf$mu_AR1[iso, ]
+    sig_AR1 <- fdf$sig_AR1[iso, ]
+    # Iterate over time
+    for (ttt in 2:fdf$n_t) {
+      # Extract flag for disaster impact
+      flag_mat <- matrix(fdf$flag[iso, ttt, 1:fdf$n_dis[iso]],nrow=fdf$n_dis[iso],ncol=1)
+      # Disaster severity calculation
+      if (sum(flag_mat) > 0) {
+        # calculate the severity
+        dsev <- t(iproxhs) %*% (flag_mat * (
+          hs * fdf$hazdur[iso, ttt, 1:fdf$n_dis[iso]] * params$beta_dur +
+            exp(-fdf$ts[iso, ttt, 1:fdf$n_dis[iso]] / hs) -
+            exp(-fdf$tf[iso, ttt, 1:fdf$n_dis[iso]] / hs)))
+      } else dsev <-rep(0,fdf$n_com)
+      # Compute GPR mean function
+      mu <- params$beta_dis * dsev * params$isev +
+        params$beta_y1 * mu_AR1 * fdf$y[iso, ttt-1, ]
+      # Compute adjusted sigma for AR1
+      red_sig <- sig_AR1 * params$sigma
+      # Log-likelihood
+      loglk<-loglk+sum(dnorm(fdf$y[iso, ttt, ],
+                             mu,red_sig,log = T))
+    }
+  }
+  
+  return(loglk)
+}
 
 # Calculate the model likelihood
 m_likelihood_1D <- function(fdf, params) {
