@@ -77,7 +77,7 @@ TrainModel_VI <- function(fdf, model) {
 # Reduce the fdf datalist to only the variables we need 
 redFdF <- function(fdf) {
   # Identify all `fdf$` elements used in the function
-  fdf_vars <- c("n_isos", "n_t", "n_dis", "n_com", "n_haz", 
+  fdf_vars <- c("n_isos", "n_t", "n_dis", "n_com", "n_haz", "dsev",
                 "flag", "htype", "iprox", "hazdur", "ts", "tf", 
                 "lnmu_AR1", "lnsig_AR1", "mu_AR1", "sig_AR1", 
                 "y", "lny", "area")
@@ -85,18 +85,18 @@ redFdF <- function(fdf) {
   fdf[names(fdf) %in% fdf_vars]
 }
 
-TrainModel_MCMLE <- function(fdf, samp = 5000, cpus = 30, LL="m_likelihood"){
+TrainModel_MCMLE <- function(fdf, samp = 5000, cpus = 30, LL="m_likelihood", mxdis = 30){
   # Reduce memory of fdf list
   fdf%<>%redFdF()
+  fdf$n_dis<-pmin(mxdis,fdf$n_dis)
   
   # Generate parameter sets
   params_list <- lapply(1:samp, function(i) list(
-    sample_id = i,  # Unique ID per sample
     hsev = rgamma(fdf$n_haz, shape = 1, rate = 1),  # Hazard severity (vector)
-    beta_dis = rnorm(1, mean = 0, sd = 1),  # Disaster-severity regression coefficient
-    beta_dur = rgamma(1, shape = 1, rate = 1),  # Hazard duration coefficient
+    beta_dis = rnorm(1, mean = 0, sd = 3),  # Disaster-severity regression coefficient
+    beta_dur = rgamma(1, shape = 1, rate = 1),  # Disaster-severity regression coefficient
     isev = rgamma(fdf$n_com, shape = 1, rate = 1),  # Commodity severity (vector)
-    sigma = rgamma(1, shape = 2, rate = 2),  # Standard deviation in AR1 model
+    sigma = rbeta(1,20,1),  # Standard deviation in AR1 model
     beta_y1 = rgamma(1, shape = 2, rate = 2)  # Gamma coefficient in AR1 model
   ))
   
@@ -123,7 +123,7 @@ TrainModel_MCMLE <- function(fdf, samp = 5000, cpus = 30, LL="m_likelihood"){
 }
 
 # Restructuring the MCMLE results into one dataframe and then calculating summaries of the different parameter samples
-compute_weighted_stats <- function(mcmle, negdis=F) {
+compute_weighted_stats <- function(mcmle) {
   # Ensure LL exists in dataframe
   if (!"LL" %in% colnames(mcmle)) {
     stop("Column 'LL' not found in the dataframe.")
@@ -131,20 +131,19 @@ compute_weighted_stats <- function(mcmle, negdis=F) {
   
   # **1. Compute statistics for all numeric columns**
   numeric_vars <- colnames(mcmle)[sapply(mcmle, is.numeric) & 
-                                    colnames(mcmle) != "LL" & 
-                                    colnames(mcmle) != "beta_dis"]
+                                    colnames(mcmle) != "LL"]
   
   # Filter high LL values (upper quartile)
   mcmle_filtered <- mcmle %>%
     filter(LL > quantile(LL, 0.75)) %>%  # Keep top 25% of samples
     mutate(
-      redLL = log(LL - min(LL) + 1e-6),  # Log-scale LL
+      redLL = exp(LL - max(LL)),  # Log-scale LL
       weights = redLL / sum(redLL)  # Normalize weights
     )
   
-  results <- lapply(numeric_vars, function(var) {
-    w_mean <- weighted.mean(log(mcmle_filtered[[var]]), mcmle_filtered$weights)
-    w_quartiles <- weighted_quantile(log(mcmle_filtered[[var]]), mcmle_filtered$weights, c(0.05, 0.25, 0.5, 0.75, 0.95))
+  results <- do.call(rbind,lapply(numeric_vars, function(var) {
+    w_mean <- weighted.mean(mcmle_filtered[[var]], mcmle_filtered$weights)
+    w_quartiles <- weighted_quantile(mcmle_filtered[[var]], mcmle_filtered$weights, c(0.05, 0.25, 0.5, 0.75, 0.95))
     
     data.frame(
       variable = var,
@@ -155,37 +154,7 @@ compute_weighted_stats <- function(mcmle, negdis=F) {
       w_q75 = w_quartiles[4],
       w_q95 = w_quartiles[5]
     )
-  })
-  
-  if(negdis) {
-    mcmle_filtered%<>%mutate(beta_dis = -1*beta_dis)
-    
-    w_mean <- weighted.mean(log(mcmle_filtered$beta_dis), mcmle_filtered$weights)
-    w_quartiles <- weighted_quantile(log(mcmle_filtered$beta_dis), mcmle_filtered$weights, c(0.05, 0.25, 0.5, 0.75, 0.95))
-    
-    results%<>%rbind(data.frame(
-      variable = "beta_dis",
-      w_mean = w_mean,
-      w_q05 = w_quartiles[1],
-      w_q25 = w_quartiles[2],
-      w_q50 = w_quartiles[3],
-      w_q75 = w_quartiles[4],
-      w_q95 = w_quartiles[5]
-    ))
-  } else {
-    w_mean <- weighted.mean(mcmle_filtered$beta_dis, mcmle_filtered$weights)
-    w_quartiles <- weighted_quantile(mcmle_filtered$beta_dis, mcmle_filtered$weights, c(0.05, 0.25, 0.5, 0.75, 0.95))
-    
-    results%<>%rbind(data.frame(
-      variable = "beta_dis",
-      w_mean = w_mean,
-      w_q05 = w_quartiles[1],
-      w_q25 = w_quartiles[2],
-      w_q50 = w_quartiles[3],
-      w_q75 = w_quartiles[4],
-      w_q95 = w_quartiles[5]
-    ))
-  }
+  }))
   
   # **2. Handle `hsev` and `isev` separately (long format)**
   # **2. Expand `hsev` and `isev` into separate variables**
@@ -202,8 +171,8 @@ compute_weighted_stats <- function(mcmle, negdis=F) {
   
   # Compute weighted statistics for each hsev[i] and isev[i]
   hsev_isev_results <- lapply(names(mcmle_expanded)[grepl("^hsev_|^isev_", names(mcmle_expanded))], function(var) {
-    w_mean <- weighted.mean(log(mcmle_expanded[[var]]), mcmle_expanded$weights, na.rm = TRUE)
-    w_quartiles <- weighted_quantile(log(mcmle_expanded[[var]]), mcmle_expanded$weights, c(0.05, 0.25, 0.5, 0.75, 0.95))
+    w_mean <- weighted.mean(mcmle_expanded[[var]], mcmle_expanded$weights, na.rm = TRUE)
+    w_quartiles <- weighted_quantile(mcmle_expanded[[var]], mcmle_expanded$weights, c(0.05, 0.25, 0.5, 0.75, 0.95))
     
     data.frame(
       variable = gsub("_", "[", var) %>% gsub("$", "]", .),  # Convert hsev_1 to hsev[1]
@@ -216,30 +185,19 @@ compute_weighted_stats <- function(mcmle, negdis=F) {
     )
   })
   
+  
+  w_quartiles <- weighted_quantile(mcmle_filtered$LL, rep(1,nrow(mcmle_filtered)), c(0.05, 0.25, 0.5, 0.75, 0.95))
+  
+  results%<>%rbind(data.frame(
+    variable = "LL",
+    w_mean = mean(mcmle_filtered$LL),
+    w_q05 = w_quartiles[1],
+    w_q25 = w_quartiles[2],
+    w_q50 = w_quartiles[3],
+    w_q75 = w_quartiles[4],
+    w_q95 = w_quartiles[5]
+  ))
+  
   # **3. Combine all results into a single dataframe**
-  results_df <- bind_rows(bind_rows(results), bind_rows(hsev_isev_results))
-  
-  results_df%<>%mutate_at(colnames(results_df)[-1],exp)
-  if(negdis) {
-    results_df[results_df$variable=="beta_dis",2:ncol(results_df)]<- -1*results_df[results_df$variable=="beta_dis",2:ncol(results_df)]
-  } else results_df[results_df$variable=="beta_dis",]<-log(results_df[results_df$variable=="beta_dis",])
-  
-  return(results_df)
+  bind_rows(bind_rows(results), bind_rows(hsev_isev_results))
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

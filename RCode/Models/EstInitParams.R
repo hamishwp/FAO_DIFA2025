@@ -76,8 +76,106 @@ generate_y <- function(fdf, params) {
 #                sigma=1)
 # outs<-generate_y(fdf,params)
 
+
 # Calculate the default model likelihood - log production values
 m_likelihood <- function(fdf, params) {
+  # Initialise log-likelihood
+  loglk<-0
+  # Iterate over countries
+  for (iso in 1:fdf$n_isos) {
+    # Save on computation
+    lnmu_AR1 <- fdf$lnmu_AR1[iso, ]
+    lnsig_AR1 <- fdf$lnsig_AR1[iso, ]
+    # Iterate over time
+    for (ttt in 2:fdf$n_t) {
+      if(sum(fdf$flag[iso, ttt, 1:fdf$n_dis[iso]])!=0 & sum(fdf$iprox[iso, 1:fdf$n_dis[iso], k])!=0){
+        # Calculate the disaster severity
+        dsev <- sapply(1:fdf$n_com,function(k){
+          log(10+sum(exp(fdf$iprox[iso, 1:fdf$n_dis[iso], k]) * 
+                       fdf$flag[iso, ttt, 1:fdf$n_dis[iso]] * 
+                       params$hsev[fdf$htype[iso, 1:fdf$n_dis[iso]]])) # * fdf$hazdur[iso, ttt, 1:fdf$n_dis[iso]]))
+        })
+      } else dsev <- rep(0,fdf$n_com)
+      # Compute GPR mean function
+      mu <- params$beta_dis * dsev * params$isev +
+        params$beta_y1 * lnmu_AR1 * fdf$lny[iso, ttt-1, ]
+      # Compute adjusted sigma for AR1
+      red_sig <- lnsig_AR1 * params$sigma
+      # Log-likelihood
+      loglk<-loglk+sum(dnorm(fdf$lny[iso, ttt, ],
+                             mu,red_sig,log = T))
+    }
+  }
+  
+  return(loglk)
+}
+
+# Calculate the default model likelihood - log production values
+m_likelihood_bin <- function(fdf, params) {
+  # Initialise log-likelihood
+  loglk<-0
+  # Iterate over countries
+  for (iso in 1:fdf$n_isos) {
+    # Save on computation
+    lnmu_AR1 <- fdf$lnmu_AR1[iso, ]
+    lnsig_AR1 <- fdf$lnsig_AR1[iso, ]
+    # Iterate over time
+    for (ttt in 2:fdf$n_t) {
+      # if(sum(fdf$flag[iso, ttt, 1:fdf$n_dis[iso]])!=0 & sum(fdf$iprox[iso, 1:fdf$n_dis[iso], k])!=0){
+      #   # Calculate the disaster severity
+      #   dsev <- sapply(1:fdf$n_com,function(k){
+      #     log(10+sum(exp(fdf$iprox[iso, 1:fdf$n_dis[iso], k]) * fdf$flag[iso, ttt, 1:fdf$n_dis[iso]] * params$hsev[fdf$htype[iso, 1:fdf$n_dis[iso]]])) # * fdf$hazdur[iso, ttt, 1:fdf$n_dis[iso]]))
+      #   })
+      # } else dsev <- rep(0,fdf$n_com)
+      dsev<-sapply(1:fdf$n_com, function(k) as.integer(fdf$iprox[iso, 1:fdf$n_dis[iso], k]>0))
+      # Compute GPR mean function
+      mu <- params$beta_dis * dsev * params$isev +
+        params$beta_y1 * lnmu_AR1 * fdf$lny[iso, ttt-1, ]
+      # Compute adjusted sigma for AR1
+      red_sig <- lnsig_AR1 * params$sigma
+      # Log-likelihood
+      loglk<-loglk+sum(dnorm(fdf$lny[iso, ttt, ],
+                             mu,red_sig,log = T))
+    }
+  }
+  
+  return(loglk)
+}
+
+# Calculate the default model likelihood - log production values
+m_likelihood_hazdur <- function(fdf, params) {
+  # Initialise log-likelihood
+  loglk<-0
+  # Iterate over countries
+  for (iso in 1:fdf$n_isos) {
+    # Save on computation
+    lnmu_AR1 <- fdf$lnmu_AR1[iso, ]
+    lnsig_AR1 <- fdf$lnsig_AR1[iso, ]
+    # Iterate over time
+    for (ttt in 2:fdf$n_t) {
+      if(sum(fdf$flag[iso, ttt, 1:fdf$n_dis[iso]])!=0 & sum(fdf$iprox[iso, 1:fdf$n_dis[iso], k])!=0){
+        # Calculate the disaster severity
+        dsev <- sapply(1:fdf$n_com,function(k){
+          log(10+sum(exp(fdf$iprox[iso, 1:fdf$n_dis[iso], k]) * (1 + params$beta_dur*fdf$hazdur[iso,ttt,1:fdf$n_dis[iso]]) *
+                           fdf$flag[iso, ttt, 1:fdf$n_dis[iso]])) # * fdf$hazdur[iso, ttt, 1:fdf$n_dis[iso]]))
+        })
+      } else dsev <- rep(0,fdf$n_com)
+      # Compute GPR mean function
+      mu <- params$beta_dis * dsev * params$isev +
+        params$beta_y1 * lnmu_AR1 * fdf$lny[iso, ttt-1, ]
+      # Compute adjusted sigma for AR1
+      red_sig <- lnsig_AR1 * params$sigma
+      # Log-likelihood
+      loglk<-loglk+sum(dnorm(fdf$lny[iso, ttt, ],
+                             mu,red_sig,log = T))
+    }
+  }
+  
+  return(loglk)
+}
+
+# Calculate the default model likelihood - log production values
+m_likelihood_old <- function(fdf, params) {
   # Initialise log-likelihood
   loglk<-0
   # Iterate over countries
@@ -92,7 +190,7 @@ m_likelihood <- function(fdf, params) {
     for (ttt in 2:fdf$n_t) {
       # Extract flag for disaster impact
       flag_mat <- matrix(fdf$flag[iso, ttt, 1:fdf$n_dis[iso]],nrow=fdf$n_dis[iso],ncol=1)
-      # Disaster severity calculation
+      # # Disaster severity calculation
       if (sum(flag_mat) > 0) {
         # calculate the severity
         dsev <- t(iproxhs) %*% (flag_mat * (
@@ -101,7 +199,7 @@ m_likelihood <- function(fdf, params) {
             exp(-fdf$tf[iso, ttt, 1:fdf$n_dis[iso]] / hs)))
       } else dsev <-rep(0,fdf$n_com)
       # Compute GPR mean function
-      mu <- params$beta_dis * dsev * params$isev +
+      mu <- params$beta_dis * fdf$dsev[iso,ttt,] * params$isev +
         params$beta_y1 * lnmu_AR1 * fdf$lny[iso, ttt-1, ]
       # Compute adjusted sigma for AR1
       red_sig <- lnsig_AR1 * params$sigma
@@ -190,43 +288,43 @@ m_likelihood_1D <- function(fdf, params) {
   return(loglk)
 }
 
-# Binary disaster occurrence variable likelihood
-m_likelihood_bin <- function(fdf, params) {
-  # Initialise log-likelihood
-  loglk<-0
-  # Iterate over countries
-  for (iso in 1:fdf$n_isos) {
-    # Save on computation
-    # hs <- params$hsev[fdf$htype[iso, 1:fdf$n_dis[iso]]]
-    # iproxhs <- fdf$iprox[iso, 1:fdf$n_dis[iso], ] / hs
-    # if(fdf$n_dis[iso] == 1) iproxhs%<>%matrix(nrow=1)
-    lnmu_AR1 <- fdf$lnmu_AR1[iso, ]
-    lnsig_AR1 <- fdf$lnsig_AR1[iso, ]
-    # Iterate over time
-    for (ttt in 2:fdf$n_t) {
-      # Extract flag for disaster impact
-      # flag_mat <- matrix(fdf$flag[iso, ttt, 1:fdf$n_dis[iso]],nrow=fdf$n_dis[iso],ncol=1)
-      # Disaster severity calculation
-      # if (sum(flag_mat) > 0) {
-        # calculate the severity
-      #   dsev <- t(iproxhs) %*% (flag_mat * (
-      #     hs * fdf$hazdur[iso, ttt, 1:fdf$n_dis[iso]] * params$beta_dur +
-      #       exp(-fdf$ts[iso, ttt, 1:fdf$n_dis[iso]] / hs) -
-      #       exp(-fdf$tf[iso, ttt, 1:fdf$n_dis[iso]] / hs)))
-      # } else dsev <-rep(0,fdf$n_com)
-      # Compute GPR mean function
-      mu <- params$beta_dis * as.integer(any(fdf$hazdur[iso, ttt, 1:fdf$n_dis[iso]]>0)) * params$isev +
-        params$beta_y1 * lnmu_AR1 * fdf$lny[iso, ttt-1, ]
-      # Compute adjusted sigma for AR1
-      red_sig <- lnsig_AR1 * params$sigma
-      # Log-likelihood
-      loglk<-loglk+sum(dnorm(sum(fdf$lny[iso, ttt, ]),
-                             sum(mu),mean(red_sig),log = T))
-    }
-  }
-  
-  return(loglk)
-}
+# # Binary disaster occurrence variable likelihood
+# m_likelihood_bin <- function(fdf, params) {
+#   # Initialise log-likelihood
+#   loglk<-0
+#   # Iterate over countries
+#   for (iso in 1:fdf$n_isos) {
+#     # Save on computation
+#     # hs <- params$hsev[fdf$htype[iso, 1:fdf$n_dis[iso]]]
+#     # iproxhs <- fdf$iprox[iso, 1:fdf$n_dis[iso], ] / hs
+#     # if(fdf$n_dis[iso] == 1) iproxhs%<>%matrix(nrow=1)
+#     lnmu_AR1 <- fdf$lnmu_AR1[iso, ]
+#     lnsig_AR1 <- fdf$lnsig_AR1[iso, ]
+#     # Iterate over time
+#     for (ttt in 2:fdf$n_t) {
+#       # Extract flag for disaster impact
+#       # flag_mat <- matrix(fdf$flag[iso, ttt, 1:fdf$n_dis[iso]],nrow=fdf$n_dis[iso],ncol=1)
+#       # Disaster severity calculation
+#       # if (sum(flag_mat) > 0) {
+#         # calculate the severity
+#       #   dsev <- t(iproxhs) %*% (flag_mat * (
+#       #     hs * fdf$hazdur[iso, ttt, 1:fdf$n_dis[iso]] * params$beta_dur +
+#       #       exp(-fdf$ts[iso, ttt, 1:fdf$n_dis[iso]] / hs) -
+#       #       exp(-fdf$tf[iso, ttt, 1:fdf$n_dis[iso]] / hs)))
+#       # } else dsev <-rep(0,fdf$n_com)
+#       # Compute GPR mean function
+#       mu <- params$beta_dis * as.integer(any(fdf$hazdur[iso, ttt, 1:fdf$n_dis[iso]]>0)) * params$isev +
+#         params$beta_y1 * lnmu_AR1 * fdf$lny[iso, ttt-1, ]
+#       # Compute adjusted sigma for AR1
+#       red_sig <- lnsig_AR1 * params$sigma
+#       # Log-likelihood
+#       loglk<-loglk+sum(dnorm(sum(fdf$lny[iso, ttt, ]),
+#                              sum(mu),mean(red_sig),log = T))
+#     }
+#   }
+#   
+#   return(loglk)
+# }
 
 # Kalman filter likelihood model
 m_likelihood_KF <- function(fdf, params) {
@@ -235,35 +333,32 @@ m_likelihood_KF <- function(fdf, params) {
   # Iterate over countries
   for (iso in 1:fdf$n_isos) {
     # Save on computation
-    hs <- params$hsev[fdf$htype[iso, 1:fdf$n_dis[iso]]]
-    iproxhs <- fdf$iprox[iso, 1:fdf$n_dis[iso], ] / hs
-    if(fdf$n_dis[iso] == 1) iproxhs %<>% matrix(nrow = 1)
     lnmu_AR1 <- fdf$lnmu_AR1[iso, ]
     lnsig_AR1 <- fdf$lnsig_AR1[iso, ]
     # Initial state estimate
     x_hat <- fdf$lny[iso, 1, ]  # Initial state = first observed log price
     P <- diag(lnsig_AR1^2)       # Initial covariance matrix
     # Define noise terms
-    Q <- diag(params$sigma^2)   # Process noise covariance (tuned parameter)
+    # Q <- diag(params$sigma^2)   # Process noise covariance (tuned parameter)
     # R <- diag(lnsig_AR1^2)  # Observation noise
     # Iterate over time
     for (ttt in 2:fdf$n_t) {
-      # Extract flag for disaster impact
-      flag_mat <- matrix(fdf$flag[iso, ttt, 1:fdf$n_dis[iso]], nrow = fdf$n_dis[iso], ncol = 1)
-      # Disaster severity calculation
-      if (sum(flag_mat) > 0) {
-        # Compute disaster severity
-        dsev <- t(iproxhs) %*% (flag_mat * (
-          hs * fdf$hazdur[iso, ttt, 1:fdf$n_dis[iso]] * params$beta_dur +
-            exp(-fdf$ts[iso, ttt, 1:fdf$n_dis[iso]] / hs) -
-            exp(-fdf$tf[iso, ttt, 1:fdf$n_dis[iso]] / hs)))
-      } else dsev <- rep(0, fdf$n_com)
+      # If there are disasters occurring during year ttt then calculate the disaster severity
+      if(sum(fdf$flag[iso, ttt, 1:fdf$n_dis[iso]])!=0 & sum(fdf$iprox[iso, 1:fdf$n_dis[iso], k])!=0){
+        # Calculate the disaster severity
+        dsev <- sapply(1:fdf$n_com,function(k){
+          log(10+sum(exp(fdf$iprox[iso, 1:fdf$n_dis[iso], k]) * fdf$flag[iso, ttt, 1:fdf$n_dis[iso]] * params$hsev[fdf$htype[iso, 1:fdf$n_dis[iso]]])) # * fdf$hazdur[iso, ttt, 1:fdf$n_dis[iso]]))
+        })
+      } else dsev <- rep(0,fdf$n_com)
+      # Compute GPR mean function
+      mu <- params$beta_dis * dsev * params$isev +
+        params$beta_y1 * lnmu_AR1 * fdf$lny[iso, ttt-1, ]
       
       # **Step 1: Prediction**
       F <- diag(params$beta_y1 * lnmu_AR1)  # Transition matrix (AR1 process)
       G <- diag(params$beta_dis * params$isev)  # Disaster severity impact
       x_pred <- F %*% x_hat + G %*% dsev  # Predicted state
-      P_pred <- F %*% P %*% t(F) + Q  # Predicted covariance
+      P_pred <- F %*% P %*% t(F) #+ Q  # Predicted covariance
       
       # **Step 2: Update**
       # H <- diag(1, fdf$n_com)  # Observation matrix (identity)
@@ -320,6 +415,39 @@ predict_y <- function(fdf, params) {
   
   return(y)
 }
+
+simulate_fdf <- function(fdf, params) {
+  # Initialise simulated lny data with the real first values
+  lny_sim <- array(NA, dim = c(fdf$n_isos, fdf$n_t, fdf$n_com))
+  lny_sim[, 1, ] <- fdf$lny[, 1, ]  # Keep real first year values
+  # Iterate over countries
+  for (iso in 1:fdf$n_isos) {
+    # Save on computation
+    lnmu_AR1 <- fdf$lnmu_AR1[iso, ]
+    lnsig_AR1 <- fdf$lnsig_AR1[iso, ]
+    # Iterate over time
+    for (ttt in 2:fdf$n_t) {
+      if(sum(fdf$flag[iso, ttt, 1:fdf$n_dis[iso]])!=0 & sum(fdf$iprox[iso, 1:fdf$n_dis[iso], k])!=0){
+        # Calculate the disaster severity
+        dsev <- sapply(1:fdf$n_com,function(k){
+          log(10+sum(exp(fdf$iprox[iso, 1:fdf$n_dis[iso], k]) * (1 + params$beta_dur*fdf$hazdur[iso,ttt,1:fdf$n_dis[iso]]) *
+                       fdf$flag[iso, ttt, 1:fdf$n_dis[iso]])) # * fdf$hazdur[iso, ttt, 1:fdf$n_dis[iso]]))
+        })
+      } else dsev <- rep(0,fdf$n_com)
+      # Compute AR1 mean function (AR1 process)
+      mu <- params$beta_dis * dsev * params$isev +
+        params$beta_y1 * lnmu_AR1 * lny_sim[iso, ttt - 1, ]
+      # Compute adjusted sigma for AR1
+      red_sig <- lnsig_AR1 * params$sigma
+      # Simulate next time step from normal distribution
+      lny_sim[iso, ttt, ] <- rnorm(fdf$n_com, mean = mu, sd = red_sig)
+    }
+  }
+  
+  return(lny_sim)
+}
+
+
 
 estimate_gp_params <- function(y_data, time_points, priors=T) {
   # Create data frame with time and response variable
