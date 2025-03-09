@@ -8,17 +8,19 @@
 # Start and end year of analysis
 syear=1991
 fyear=2023
+# Maximum number of disasters per country to be included
+mxdis <- 10
 # Do we want to use the Desinventar data to infer disaster severity? If not, use EM-DAT multivariate model
 Desinventar<-T
 # MCMC hyperparameters
-hyppars<-list(chains=8,iter=3000,burnin=1000,adapt=0.95,maxtree=30)
+hyppars<-list(chains=8,iter=5000,burnin=1500,adapt=0.95,maxtree=30)
 # Methodology to parameterise the model (can be 'MCMC', 'Optim' or 'VI'):
 methody <- "MCMC"
 # Load the packages & default functions
 source("./RCode/Setup/GetPackages.R")
 source("./RCode/Setup/Functions.R")
 # Which STAN model to use?
-stan_model_code <- "./RCode/Models/DIFA2025_log_samAR_repr_V1.stan" 
+stan_model_code <- "./RCode/Models/DIFA2025_log_empAR_simDS_V1.stan" 
 iprox_dat <- ifelse(grepl("redDisSev",stan_model_code),F,T); GPR <- ifelse(!(grepl("noGPR",stan_model_code) | grepl("empAR",stan_model_code)),T,F); empAR <- ifelse(grepl("empAR",stan_model_code),T,F)
 # Save all files with this time-dependent extension
 save_str<-paste0("_",str_replace_all(str_replace_all(Sys.time()," ","_"),":",""))
@@ -27,6 +29,8 @@ save_str<-paste0("_",str_replace_all(str_replace_all(Sys.time()," ","_"),":","")
 execDIFA<-function(method="MCMC",presave=T){
   if(presave & file.exists("./Data/Results/fdf.RData")) {
     fdf<-readRDS("./Data/Results/fdf.RData")
+    fdf$mxdis<-dim(fdf$flag)[3]
+    fdf$n_dis<-pmin(mxdis,fdf$n_dis)
   } else {
     # Extract, transform then merge data (functions found in 'RCode/Data_Wrangling/')
     if(presave & file.exists("./Data/Results/difa2025.RData")) {difa<-readRDS("./Data/Results/difa2025.RData") 
@@ -36,11 +40,13 @@ execDIFA<-function(method="MCMC",presave=T){
     } else sevvies<-GetDisSev(difa$dissie$dessie,difa$dissie$emdat)%>%
         ConvHe2Tonnes(difa$faostat)
     # Prepare the data to be input into the stan model
-    fdf<-Prepare4Model(difa$faostat,sevvies,fyear=fyear,syear=syear)
+    fdf<-Prepare4Model(difa$faostat,sevvies,fyear=fyear,syear=syear,mxdis = mxdis)
+    fdf$mxdis<-dim(fdf$flag)[3]
     rm(difa)
   }
   # Train the model
-  mGPR<-TrainModel(fdf=fdf,model=stan_model_code,method=method)
+  mGPR<-TrainModel(fdf=fdf%>%ModMxDis(),
+                   model=stan_model_code,method=method)
   
   return(list(fdf=fdf,
               mGPR=mGPR))

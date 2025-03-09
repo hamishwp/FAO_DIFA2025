@@ -9,6 +9,7 @@ data {
   int<lower=1> n_t; // Number of years
   int<lower=1> n_isos; // Number of countries
   array[n_isos] int<lower=0> n_dis; // Number of disasters, per country
+  int<lower=1> mxdis; // Maximum number of disasters over all countries
   int<lower=1> n_haz; // Number of hazard types
   int<lower=1> n_com; // Number of commodities
   // Time series data - EOY
@@ -17,17 +18,17 @@ data {
   array[n_isos,n_t,n_com] real<lower=0> y;
   array[n_isos,n_t,n_com] real lny; 
   // Flag to ensure disasters do not contribute to years previous to the disaster occurrence
-  array[n_isos, n_t, max(n_dis)] int <lower = 0, upper = 1> flag;
+  array[n_isos, n_t, mxdis] int <lower = 0, upper = 1> flag;
   // Time t-1 of the disaster since the end of the hazard for EOY t
-  array[n_isos, n_t, max(n_dis)] real <lower = 0> ts;
+  // array[n_isos, n_t, mxdis] real <lower = 0> ts;
   // Time t of the disaster since the end of the hazard for EOY t
-  array[n_isos, n_t, max(n_dis)] real <lower = 0> tf;
+  // array[n_isos, n_t, mxdis] real <lower = 0> tf;
   // Duration of the disaster post-hazard during year ttt
-  array[n_isos, n_t, max(n_dis)] real <lower = 0> hazdur;
+  array[n_isos, n_t, mxdis] real <lower = 0> hazdur;
   // Hazard type of the disaster
-  array[n_isos, max(n_dis)] int <lower = 0> htype;
+  array[n_isos, mxdis] int <lower = 0> htype;
   // Expected value of disaster severity, per disaster
-  array[n_isos, max(n_dis), n_com] real<lower=0> iprox;
+  array[n_isos, mxdis, n_com] real<lower=0> iprox;
   // Mean AR1 trend in commodity data, per country
   array[n_isos,n_com] real lnmu_AR1;
   // Standard deviation in AR1 trend in commodity data, per country
@@ -46,58 +47,58 @@ parameters {
   vector<lower=0>[n_com] isev; //  Item/Commodity severity
   real beta_dis; // Disaster-severity regression coefficient
   real<lower=0> beta_dur; // Hazard duration regression coefficient
-  array[n_isos,n_com] real<lower=0> beta_muAR1; // AR1 mean function trend, per country
-  array[n_isos,n_com] real<lower=0> beta_sigAR1; // AR1 standard deviation function trend, per country
+  real<lower=0> beta_muAR1; // AR1 mean function trend, per country
+  real<lower=0,upper=1> beta_sigAR1; // AR1 standard deviation function trend, per country
 }
 
 model {
-  // Priors
-  hsev ~ gamma(1,1); // Hazard severity
-  beta_dis ~ normal(0,1); // Disaster-severity regression coefficient
-  beta_dur ~ gamma(1,1); // Hazard duration coefficient
-  isev ~ gamma(1,1); // Commodity severity
   vector[n_com] mu; // Raw AR1 mean
   vector[n_com] dsev; // Cumulative total disaster severity 
   vector[n_com] sigma;
+  vector[n_com] vemu_AR1;
   // Per country, sample from the model!
   for(iso in 1:n_isos){
     // Initialise temporary variables here to reduce computation
     vector[n_dis[iso]] flag_vec;
     vector[n_dis[iso]] iproxhs;
     vector[n_dis[iso]] hs;
-    beta_muAR1[iso,] ~ gamma(1,1);
-    beta_sigAR1[iso,] ~ gamma(1,1);
-    // Set the first value of the time series to not contribute to the likelihood
-    lny[iso, 1, ] ~ normal(lny[iso, 1, ],1);
+    // AR1 mean (phi)
+    vemu_AR1 = beta_muAR1*to_vector(lnmu_AR1[iso, ]);
+    // AR1 s.d.
+    sigma = beta_sigAR1*to_vector(lnsig_AR1[iso,]);
+    // Save on computation
+    hs = hsev[htype[iso, 1:n_dis[iso]]];
     // Sample through the EOY values
     for(ttt in 2:n_t){
       // Set the disaster severity to zero at first, as well as the AR1 mean function
       dsev = rep_vector(0,n_com);
       // Save some computation
-      flag_vec = to_vector(flag[iso, ttt, 1:n_dis[iso]]);
+      flag_vec[1:n_dis[iso]] = to_vector(flag[iso, ttt, 1:n_dis[iso]]);
       // Sum all the contributing disaster components if there are any non-zero values
-      if(sum(flag_vec)>0){
-        // Save on computation
-        hs = hsev[htype[iso, 1:n_dis[iso]]];
+      if(sum(flag_vec[1:n_dis[iso]])>0){
         // Loop over commodities
         for(ic in 1:n_com){
-          // Save on computation  
-          iproxhs = to_vector(iprox[iso, 1:n_dis[iso], ic]) ./ hs;
-          // Calculate the disaster severity
-          dsev[ic] = sum(flag_vec.*iproxhs.*
-            hs.*to_vector(hazdur[iso, ttt, 1:n_dis[iso]])*beta_dur +
-            exp(-to_vector(ts[iso,ttt, 1:n_dis[iso]]).*hs) -
-            exp(-to_vector(tf[iso,ttt, 1:n_dis[iso]]).*hs)));
+          if(sum(iprox[iso, 1:n_dis[iso], ic])>0){
+            // Save on computation  
+            iproxhs = to_vector(iprox[iso, 1:n_dis[iso], ic]) ./ hs[1:n_dis[iso]];
+            // Calculate the disaster severity
+            dsev[ic] = log(1+sum(flag_vec[1:n_dis[iso]].*(rep_vector(1,n_dis[iso])+to_vector(hazdur[iso, ttt, 1:n_dis[iso]])*beta_dur).*exp(iproxhs[1:n_dis[iso]])));
+          }
         }
         // Set the mean function
-        mu = beta_dis*dsev.*isev + to_vector(beta_muAR1[iso, ]).*to_vector(lnmu_AR1[iso, ]).*to_vector(lny[iso, ttt-1, ]); // Auto-Regressive first order (AR1) model
-        // s.d.
-        sigma = to_vector(lnsig_AR1[iso,]).*to_vector(beta_sigAR1[iso, ]);
+        mu = beta_dis*dsev.*isev + vemu_AR1.*to_vector(lny[iso, ttt-1, ]); // Auto-Regressive first order (AR1) model
         // Reparameterized likelihood
         to_vector(lny[iso, ttt, ]) ~ normal(mu, sigma);
       }
     }
   }
+  // Priors
+  hsev ~ gamma(1,1); // Hazard severity
+  beta_dis ~ normal(0,1); // Disaster-severity regression coefficient
+  beta_dur ~ gamma(1,1); // Hazard duration coefficient
+  isev ~ gamma(1,1); // Commodity severity
+  beta_muAR1 ~ gamma(1,1);
+  beta_sigAR1 ~ beta(20,1);
 }
 
 

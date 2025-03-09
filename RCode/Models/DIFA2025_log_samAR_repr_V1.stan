@@ -40,6 +40,19 @@ data {
   // array[n_isos,n_com] real<lower = 0, upper = 1> weights;
 }
 
+transformed data {
+  // Reparameterise the problem to increase numerical stability
+  array[n_isos,n_t,n_com] real lny_p = rep_array(0,n_isos,n_t,n_com);  
+  // Placeholder for later
+  for(iso in 1:n_isos){
+    for(ttt in 2:n_t){
+      for(ic in 1:n_com){
+        lny_p[iso,ttt,ic] = (lny[iso, ttt, ic] - lnmu_AR1[iso, ic]*lny[iso, ttt-1, ic]) ./ lnsig_AR1[iso, ic];
+      }
+    }
+  }
+}
+
 parameters {
   // Disaster parameters
   vector<lower=0>[n_haz] hsev; // Hazard severity, per hazard type
@@ -68,7 +81,7 @@ model {
     beta_muAR1[iso,] ~ gamma(1,1);
     beta_sigAR1[iso,] ~ gamma(1,1);
     // Set the first value of the time series to not contribute to the likelihood
-    lny[iso, 1, ] ~ normal(lny[iso, 1, ],1);
+    lny_p[iso, 1, ] ~ normal(lny_p[iso, 1, ],1);
     // Sample through the EOY values
     for(ttt in 2:n_t){
       // Set the disaster severity to zero at first, as well as the AR1 mean function
@@ -84,17 +97,17 @@ model {
           // Save on computation  
           iproxhs = to_vector(iprox[iso, 1:n_dis[iso], ic]) ./ hs;
           // Calculate the disaster severity
-          dsev[ic] = sum(flag_vec.*iproxhs.*
+          dsev[ic] = sum(flag_vec.*iproxhs.*(
             hs.*to_vector(hazdur[iso, ttt, 1:n_dis[iso]])*beta_dur +
             exp(-to_vector(ts[iso,ttt, 1:n_dis[iso]]).*hs) -
             exp(-to_vector(tf[iso,ttt, 1:n_dis[iso]]).*hs)));
         }
         // Set the mean function
-        mu = beta_dis*dsev.*isev + to_vector(beta_muAR1[iso, ]).*to_vector(lnmu_AR1[iso, ]).*to_vector(lny[iso, ttt-1, ]); // Auto-Regressive first order (AR1) model
+        mu = beta_dis*dsev.*isev + to_vector(lnmu_AR1[iso, ]).*to_vector(lny[iso, ttt-1, ]).*(to_vector(beta_muAR1[iso, ]) - rep_vector(1,n_com)); // Auto-Regressive first order (AR1) model
         // s.d.
-        sigma = to_vector(lnsig_AR1[iso,]).*to_vector(beta_sigAR1[iso, ]);
+        sigma = to_vector(beta_sigAR1[iso, ]);
         // Reparameterized likelihood
-        to_vector(lny[iso, ttt, ]) ~ normal(mu, sigma);
+        to_vector(lny_p[iso, ttt, ]) ~ normal(mu, sigma);
       }
     }
   }

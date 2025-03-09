@@ -1,3 +1,31 @@
+compute_cumulative_means <- function(mcmle, var_name, loggy=F) {
+  # Ensure input variable exists
+  if (!(var_name %in% colnames(mcmle))) {
+    stop(paste("Variable", var_name, "not found in the dataframe"))
+  }
+  
+  # Order by log-likelihood (LL) in descending order
+  mcmle <- mcmle %>% arrange(desc(LL))
+  
+  # Compute cumulative mean for the specified variable
+  cum_var_name <- paste0("cum_", var_name)
+  if(!loggy) {mcmle[[cum_var_name]] <- cumsum(mcmle[[var_name]]) / seq_along(mcmle[[var_name]])
+  } else mcmle[[cum_var_name]] <- cumsum(log(mcmle[[var_name]])) / seq_along(mcmle[[var_name]])
+  
+  # Compute cumulative mean for log-likelihood
+  mcmle$cumLL <- cumsum(mcmle$LL) / seq_along(mcmle$LL)
+  
+  return(mcmle)
+}
+
+# Weighted quantiles
+weighted_quantile <- function(x, w, probs) {
+  order_idx <- order(x)
+  x_sorted <- x[order_idx]
+  w_sorted <- w[order_idx]
+  w_cum <- cumsum(w_sorted) / sum(w_sorted)
+  approx(w_cum, x_sorted, xout = probs, rule = 2)$y
+}
 
 returnX<-function(x,a=NULL,b=NULL) x
 negexp <-function(x) -exp(x)
