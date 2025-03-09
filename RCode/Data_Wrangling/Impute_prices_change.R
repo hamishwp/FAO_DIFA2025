@@ -179,27 +179,61 @@ country_region = read.csv("Data/RawData/country_region.csv")%>%
     - X
   )
 
-
-#Check for NA's'
-#mu_price <- prices[[1]]
-#ISO <- 170
-#Years <- 34
-#Items <- 6
-
-#for (i in 1:ISO) {
-#  iso <- all_isos[i]
-#  for (j in 1:Years) {
-#    year <- all_years[j]
-#    for (k in 1:Items) {
-#      item <- all_items[k]
+ImputeRegion <- function(prices, country_region) {
+  
+  mu_price <- prices$mu_price
+  sig_price <- prices$sig_price
+  
+  isos <- dimnames(mu_price)[[1]]
+  years <- dimnames(mu_price)[[2]]
+  items <- dimnames(mu_price)[[3]]
+  
+  iso2sub <- setNames(as.character(country_region$unsd_sub_reg), country_region$ISO)
+  iso2macro <- setNames(as.character(country_region$unsd_macro_reg), country_region$ISO)
+  
+  for (j in seq_along(years)) {
+    for (k in seq_along(items)) {
+      prices_vec <- mu_price[, j, k]
+      global_median <- if (all(is.na(prices_vec))) NA else median(prices_vec, na.rm = TRUE)
       
-#      iso_index <- match(iso, all_isos)
-#      year_index <- match(year, all_years)
-#      item_index <- match(item, all_items)
+      sub_regions <- unique(iso2sub[isos])
+      sub_regions <- sub_regions[!is.na(sub_regions)]
+      subregion_medians <- sapply(sub_regions, function(subr) {
+        indices <- which(iso2sub[isos] == subr)
+        vec <- prices_vec[indices]
+        if (all(is.na(vec))) NA else median(vec, na.rm = TRUE)
+      })
       
-#      if (is.na(mu_price[iso_index, year_index, item_index])) {
-#        cat("NA in", iso, ", Year =", year, ", Item =", item, "\n")
-#      }
-#    }
-#  }
-#}
+      macro_regions <- unique(iso2macro[isos])
+      macro_regions <- macro_regions[!is.na(macro_regions)]
+      macro_medians <- sapply(macro_regions, function(macro) {
+        indices <- which(iso2macro[isos] == macro)
+        vec <- prices_vec[indices]
+        if (all(is.na(vec))) NA else median(vec, na.rm = TRUE)
+      })
+      
+      for (i in seq_along(isos)) {
+        if (is.na(mu_price[i, j, k])) {
+          subr <- iso2sub[isos[i]]
+          macro <- iso2macro[isos[i]]
+          imputed_val <- if (!is.na(subr) && !is.na(subregion_medians[subr])) {
+            subregion_medians[subr]
+          } else if (!is.na(macro) && !is.na(macro_medians[macro])) {
+            macro_medians[macro]
+          } else {
+            global_median
+          }
+          mu_price[i, j, k] <- imputed_val
+        }
+      }
+    }
+  }
+  
+  
+  return(list(mu_price = mu_price, sig_price = sig_price))
+}
+
+prices3 <- prices2%>%
+  ImputeRegion(
+    country_region
+  )
