@@ -9,6 +9,7 @@ data {
   int<lower=1> n_t; // Number of years
   int<lower=1> n_isos; // Number of countries
   array[n_isos] int<lower=0> n_dis; // Number of disasters, per country
+  int<lower=1> mxdis; // Maximum number of disasters over all countries
   int<lower=1> n_haz; // Number of hazard types
   int<lower=1> n_com; // Number of commodities
   // Time series data - EOY
@@ -17,17 +18,17 @@ data {
   array[n_isos,n_t,n_com] real<lower=0> y;
   array[n_isos,n_t,n_com] real lny; 
   // Flag to ensure disasters do not contribute to years previous to the disaster occurrence
-  array[n_isos, n_t, max(n_dis)] int <lower = 0, upper = 1> flag;
+  array[n_isos, n_t, mxdis] int <lower = 0, upper = 1> flag;
   // Time t-1 of the disaster since the end of the hazard for EOY t
-  array[n_isos, n_t, max(n_dis)] real <lower = 0> ts;
+  array[n_isos, n_t, mxdis] real <lower = 0> ts;
   // Time t of the disaster since the end of the hazard for EOY t
-  array[n_isos, n_t, max(n_dis)] real <lower = 0> tf;
+  array[n_isos, n_t, mxdis] real <lower = 0> tf;
   // Duration of the disaster post-hazard during year ttt
-  array[n_isos, n_t, max(n_dis)] real <lower = 0> hazdur;
+  array[n_isos, n_t, mxdis] real <lower = 0> hazdur;
   // Hazard type of the disaster
-  array[n_isos, max(n_dis)] int <lower = 0> htype;
+  array[n_isos, mxdis] int <lower = 0> htype;
   // Expected value of disaster severity, per disaster
-  array[n_isos, max(n_dis), n_com] real<lower=0> iprox;
+  array[n_isos, mxdis, n_com] real<lower=0> iprox;
   // Mean AR1 trend in commodity data, per country
   array[n_isos,n_com] real lnmu_AR1;
   // Standard deviation in AR1 trend in commodity data, per country

@@ -29,6 +29,7 @@ save_str<-paste0("_",str_replace_all(str_replace_all(Sys.time()," ","_"),":","")
 execDIFA<-function(method="MCMC",presave=T){
   if(presave & file.exists("./Data/Results/fdf.RData")) {
     fdf<-readRDS("./Data/Results/fdf.RData")
+    fdf$mxdis<-dim(fdf$flag)[3]
     fdf$n_dis<-pmin(mxdis,fdf$n_dis)
   } else {
     # Extract, transform then merge data (functions found in 'RCode/Data_Wrangling/')
@@ -40,6 +41,7 @@ execDIFA<-function(method="MCMC",presave=T){
         ConvHe2Tonnes(difa$faostat)
     # Prepare the data to be input into the stan model
     fdf<-Prepare4Model(difa$faostat,sevvies,fyear=fyear,syear=syear,n_dis = mxdis)
+    fdf$mxdis<-dim(fdf$flag)[3]
     rm(difa)
   }
   # Train the model
