@@ -51,13 +51,6 @@ parameters {
 }
 
 model {
-  // Priors
-  hsev ~ gamma(1,1); // Hazard severity
-  beta_dis ~ normal(0,1); // Disaster-severity regression coefficient
-  beta_dur ~ gamma(1,1); // Hazard duration coefficient
-  isev ~ gamma(1,1); // Commodity severity
-  beta_muAR1 ~ gamma(1,1);
-  beta_sigAR1 ~ beta(20,1);
   vector[n_com] mu; // Raw AR1 mean
   vector[n_com] dsev; // Cumulative total disaster severity 
   vector[n_com] sigma;
@@ -98,6 +91,13 @@ model {
       }
     }
   }
+  // Priors
+  hsev ~ gamma(1,1); // Hazard severity
+  beta_dis ~ normal(0,1); // Disaster-severity regression coefficient
+  beta_dur ~ gamma(1,1); // Hazard duration coefficient
+  isev ~ gamma(1,1); // Commodity severity
+  beta_muAR1 ~ gamma(1,1);
+  beta_sigAR1 ~ beta(20,1);
 }
 
 

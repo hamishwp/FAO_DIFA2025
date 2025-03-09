@@ -492,8 +492,8 @@ InitParams<-function(fdf, iprox_dat=T, GPR=F, empAR=F){
          beta_dur = 1,
          hsev = rep(1,fdf$n_haz),
          isev = rep(1,fdf$n_com),
-         gamAR1 = 1,
-         sdAR1 = 1)
+         beta_muAR1 = 1,
+         beta_sigAR1 = 0.99)
   })
   
   
