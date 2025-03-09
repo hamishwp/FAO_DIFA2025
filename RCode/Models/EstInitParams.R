@@ -76,7 +76,7 @@ generate_y <- function(fdf, params) {
 #                sigma=1)
 # outs<-generate_y(fdf,params)
 
-# Calculate the model likelihood
+# Calculate the default model likelihood - log production values
 m_likelihood <- function(fdf, params) {
   # Initialise log-likelihood
   loglk<-0
@@ -114,7 +114,7 @@ m_likelihood <- function(fdf, params) {
   return(loglk)
 }
 
-# Calculate the model likelihood
+# Calculate the non-log production value model likelihood
 m_likelihood_nology <- function(fdf, params) {
   # Initialise log-likelihood
   loglk<-0
@@ -152,7 +152,7 @@ m_likelihood_nology <- function(fdf, params) {
   return(loglk)
 }
 
-# Calculate the model likelihood
+# Calculate for all commodities summed into one total production
 m_likelihood_1D <- function(fdf, params) {
   # Initialise log-likelihood
   loglk<-0
@@ -190,7 +190,7 @@ m_likelihood_1D <- function(fdf, params) {
   return(loglk)
 }
 
-# Calculate the model likelihood
+# Binary disaster occurrence variable likelihood
 m_likelihood_bin <- function(fdf, params) {
   # Initialise log-likelihood
   loglk<-0
@@ -228,6 +228,7 @@ m_likelihood_bin <- function(fdf, params) {
   return(loglk)
 }
 
+# Kalman filter likelihood model
 m_likelihood_KF <- function(fdf, params) {
   # Initialise log-likelihood
   loglk <- 0
@@ -282,7 +283,7 @@ m_likelihood_KF <- function(fdf, params) {
   return(loglk)
 }
 
-
+# Predict the production values for the default model
 predict_y <- function(fdf, params) {
   # Initialise production data
   y <- fdf$lny
