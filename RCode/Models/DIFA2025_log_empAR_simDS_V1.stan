@@ -72,16 +72,16 @@ model {
       // Set the disaster severity to zero at first, as well as the AR1 mean function
       dsev = rep_vector(0,n_com);
       // Save some computation
-      flag_vec = to_vector(flag[iso, ttt, 1:n_dis[iso]]);
+      flag_vec[1:n_dis[iso]] = to_vector(flag[iso, ttt, 1:n_dis[iso]]);
       // Sum all the contributing disaster components if there are any non-zero values
-      if(sum(flag_vec)>0){
+      if(sum(flag_vec[1:n_dis[iso]])>0){
         // Loop over commodities
         for(ic in 1:n_com){
           if(sum(iprox[iso, 1:n_dis[iso], ic])>0){
             // Save on computation  
             iproxhs = to_vector(iprox[iso, 1:n_dis[iso], ic]) ./ hs[1:n_dis[iso]];
             // Calculate the disaster severity
-            dsev[ic] = sum(flag_vec.*(rep_vector(1,n_dis[iso])+to_vector(hazdur[iso, ttt, 1:n_dis[iso]])*beta_dur)*log(1+sum(exp(iproxhs))));
+            dsev[ic] = sum(flag_vec[1:n_dis[iso]].*(rep_vector(1,n_dis[iso])+to_vector(hazdur[iso, ttt, 1:n_dis[iso]])*beta_dur)*log(1+sum(exp(iproxhs))));
           }
         }
         // Set the mean function
