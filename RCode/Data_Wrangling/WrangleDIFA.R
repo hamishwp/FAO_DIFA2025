@@ -286,6 +286,15 @@ getData<-function(syear=1990,fyear=NULL){
     PrepDIFA()
 }
 
+ModMxDis<-function(fdf){
+  fdf$htype<-fdf$htype[,1:fdf$mxdis]
+  fdf$flag<-fdf$flag[,,1:fdf$mxdis]
+  fdf$hazdur<-fdf$hazdur[,,1:fdf$mxdis]
+  fdf$iprox<-fdf$iprox[,1:fdf$mxdis,]
+  
+  return(fdf)
+}
+
 # Check through the values to be input to stan
 Check4Stan<-function(fdf){
   # Which elements have NAs?
@@ -348,7 +357,7 @@ Check4Stan<-function(fdf){
 }
 
 # Once disaster severity has been predicted, generate all the data we need 
-Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023, loggy=T, n_dis=15){
+Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023, loggy=T, mxdis=15){
   # Some dimensions
   n_t <- fyear-syear+1L        # Number of years
   n_com <- length(unique(faostat$item_groups$item_grouping_f))
@@ -392,7 +401,7 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023, loggy=T, n_dis=15
            weights=weights/max(weights,na.rm=T))%>%
     ungroup()%>%mutate(weights=case_when(is.infinite(weights)~1,T~weights))%>%
     arrange(desc(weights))%>%
-    group_by(ISO3)%>%slice(1:pmin(n_dis,n()))
+    group_by(ISO3)%>%slice(1:pmin(mxdis,n()))
   # Filter the disaster events
   redsev<-sevvies%>%filter(disno%in%disnos$disno)%>%
     mutate(haz_grp_int=as.integer(as.factor(haz_grp)))
@@ -418,25 +427,25 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023, loggy=T, n_dis=15
   time <- seq(1, n_t)
   yrs <- seq(syear,fyear)
   # Hazard types per disaster 
-  htype <- array(0, dim = c(n_isos, n_dis)) 
+  htype <- array(0, dim = c(n_isos, mxdis)) 
   # Disaster occurrence flag
-  flag <- array(0, dim = c(n_isos, n_t, n_dis),
+  flag <- array(0, dim = c(n_isos, n_t, mxdis),
                 dimnames = list(isos, as.character(yrs), NULL)) 
   # Hazard duration per year
-  hazdur <- array(0, dim = c(n_isos, n_t, n_dis),
+  hazdur <- array(0, dim = c(n_isos, n_t, mxdis),
                   dimnames = list(isos, as.character(yrs), NULL)) 
   # Disaster event_id 
-  ev_id <- array(NA, dim = c(n_isos, n_dis)) 
+  ev_id <- array(NA, dim = c(n_isos, mxdis)) 
   # Disaster severity
-  iprox <- array(0, dim = c(n_isos, n_dis, n_com)) 
+  iprox <- array(0, dim = c(n_isos, mxdis, n_com)) 
   # AR1-related variables
   mu_AR1 <- array(0, dim = c(n_isos, n_com)) 
   sig_AR1 <- array(0, dim = c(n_isos, n_com)) 
   lnmu_AR1 <- array(0, dim = c(n_isos, n_com)) 
   lnsig_AR1 <- array(0, dim = c(n_isos, n_com)) 
   # Disaster severity sampling (replaces iprox)
-  mu_dis <- array(0, dim = c(n_isos, n_dis, n_com)) 
-  sig_dis <- array(0, dim = c(n_isos, n_dis, n_com)) 
+  mu_dis <- array(0, dim = c(n_isos, mxdis, n_com)) 
+  sig_dis <- array(0, dim = c(n_isos, mxdis, n_com)) 
   # Commodity data
   y <- lny <- array(0, dim = c(n_isos, n_t, n_com)) 
   # Create an array of the number of disasters per country
@@ -533,6 +542,7 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023, loggy=T, n_dis=15
             n_dis = n_dis_v,
             n_haz = n_haz,
             n_com = n_com,
+            mxdis = mxdis,
             time = time,
             isos = isos,
             y = y,
@@ -549,7 +559,7 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023, loggy=T, n_dis=15
             mu_dis=mu_dis,
             sig_dis=sig_dis)
   # Check through the list!
-  fdf%>%Check4Stan()
+  fdf%>%ModMxDis()%>%Check4Stan()
 }
 
 # Once disaster severity has been predicted, generate all the data we need 
@@ -791,6 +801,7 @@ Prepare4Model_oldDisSevModel<-function(faostat,sevvies,syear=1991,fyear=2023, lo
             n_dis = n_dis_v,
             n_haz = n_haz,
             n_com = n_com,
+            mxdis = mxdis,
             time = time,
             isos = isos,
             y = y,
@@ -816,6 +827,6 @@ Prepare4Model_oldDisSevModel<-function(faostat,sevvies,syear=1991,fyear=2023, lo
             mu_price=prices$mu_price,
             sig_price=prices$sig_price)
   # Check through the list!
-  fdf%>%Check4Stan()
+  fdf%>%ModMxDis()%>%Check4Stan()
 }
 

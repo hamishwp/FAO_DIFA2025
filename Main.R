@@ -40,12 +40,13 @@ execDIFA<-function(method="MCMC",presave=T){
     } else sevvies<-GetDisSev(difa$dissie$dessie,difa$dissie$emdat)%>%
         ConvHe2Tonnes(difa$faostat)
     # Prepare the data to be input into the stan model
-    fdf<-Prepare4Model(difa$faostat,sevvies,fyear=fyear,syear=syear,n_dis = mxdis)
+    fdf<-Prepare4Model(difa$faostat,sevvies,fyear=fyear,syear=syear,mxdis = mxdis)
     fdf$mxdis<-dim(fdf$flag)[3]
     rm(difa)
   }
   # Train the model
-  mGPR<-TrainModel(fdf=fdf,model=stan_model_code,method=method)
+  mGPR<-TrainModel(fdf=fdf%>%ModMxDis(),
+                   model=stan_model_code,method=method)
   
   return(list(fdf=fdf,
               mGPR=mGPR))

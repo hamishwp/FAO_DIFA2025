@@ -20,9 +20,9 @@ data {
   // Flag to ensure disasters do not contribute to years previous to the disaster occurrence
   array[n_isos, n_t, mxdis] int <lower = 0, upper = 1> flag;
   // Time t-1 of the disaster since the end of the hazard for EOY t
-  array[n_isos, n_t, mxdis] real <lower = 0> ts;
+  // array[n_isos, n_t, mxdis] real <lower = 0> ts;
   // Time t of the disaster since the end of the hazard for EOY t
-  array[n_isos, n_t, mxdis] real <lower = 0> tf;
+  // array[n_isos, n_t, mxdis] real <lower = 0> tf;
   // Duration of the disaster post-hazard during year ttt
   array[n_isos, n_t, mxdis] real <lower = 0> hazdur;
   // Hazard type of the disaster
@@ -82,7 +82,7 @@ model {
             // Save on computation  
             iproxhs = to_vector(iprox[iso, 1:n_dis[iso], ic]) ./ hs[1:n_dis[iso]];
             // Calculate the disaster severity
-            dsev[ic] = sum(flag_vec[1:n_dis[iso]].*(rep_vector(1,n_dis[iso])+to_vector(hazdur[iso, ttt, 1:n_dis[iso]])*beta_dur)*log(1+sum(exp(iproxhs))));
+            dsev[ic] = log(1+sum(flag_vec[1:n_dis[iso]].*(rep_vector(1,n_dis[iso])+to_vector(hazdur[iso, ttt, 1:n_dis[iso]])*beta_dur).*exp(iproxhs[1:n_dis[iso]])));
           }
         }
         // Set the mean function
