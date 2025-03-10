@@ -27,12 +27,14 @@ data {
   array[n_isos, n_t, mxdis] real <lower = 0> hazdur;
   // Hazard type of the disaster
   array[n_isos, mxdis] int <lower = 0> htype;
-  // Expected value of disaster severity, per disaster
-  array[n_isos, mxdis, n_com] real<lower=0> iprox;
   // Mean AR1 trend in commodity data, per country
   array[n_isos,n_com] real lnmu_AR1;
   // Standard deviation in AR1 trend in commodity data, per country
   array[n_isos,n_com] real<lower=0> lnsig_AR1;
+  // (Gamma) Shape value of disaster severity, per disaster
+  array[n_isos, mxdis, n_com] real<lower=0> mu_dis;
+  // (Gamma) Rate of disaster severity, per disaster
+  array[n_isos, mxdis, n_com] real<lower=0> sig_dis;
   // Expected values of the commodity price data
   // array[n_isos, n_t, n_com] real mu_price;
   // Variance of the commodity price data
@@ -49,6 +51,8 @@ parameters {
   real<lower=0> beta_dur; // Hazard duration regression coefficient
   real<lower=0> beta_muAR1; // AR1 mean function trend, per country
   real<lower=0,upper=1> beta_sigAR1; // AR1 standard deviation function trend, per country
+  // Expected value of disaster severity, per disaster
+  array[n_isos, mxdis, n_com] real<lower=0> iprox;
 }
 
 model {
@@ -78,6 +82,11 @@ model {
       if(sum(flag_vec)>0){
         // Loop over commodities
         for(ic in 1:n_com){
+          vector[n_dis[iso]] muie = to_vector(mu_dis[iso, 1:n_dis[iso], ic]);
+          vector[n_dis[iso]] sdie = to_vector(sig_dis[iso, 1:n_dis[iso], ic]);
+          // Sample the disaster severity
+          to_vector(iprox[iso,1:n_dis[iso],ic]) ~ normal(muie, sdie);
+          // Calculate disaster severity from iprox
           if(sum(iprox[iso, 1:n_dis[iso], ic])>0){
             // Save on computation  
             iproxhs = to_vector(iprox[iso, 1:n_dis[iso], ic]) ./ hs[1:n_dis[iso]];

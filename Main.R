@@ -20,7 +20,7 @@ methody <- "MCMC"
 source("./RCode/Setup/GetPackages.R")
 source("./RCode/Setup/Functions.R")
 # Which STAN model to use?
-stan_model_code <- "./RCode/Models/DIFA2025_log_empAR_simDS_V1.stan" 
+stan_model_code <- "./RCode/Models/DIFA2025_log_empAR_simDS_samIprox_V1.stan" 
 iprox_dat <- ifelse(grepl("redDisSev",stan_model_code),F,T); GPR <- ifelse(!(grepl("noGPR",stan_model_code) | grepl("empAR",stan_model_code)),T,F); empAR <- ifelse(grepl("empAR",stan_model_code),T,F)
 # Save all files with this time-dependent extension
 save_str<-paste0("_",str_replace_all(str_replace_all(Sys.time()," ","_"),":",""))
@@ -29,7 +29,7 @@ save_str<-paste0("_",str_replace_all(str_replace_all(Sys.time()," ","_"),":","")
 execDIFA<-function(method="MCMC",presave=T){
   if(presave & file.exists("./Data/Results/fdf.RData")) {
     fdf<-readRDS("./Data/Results/fdf.RData")
-    fdf$mxdis<-dim(fdf$flag)[3]
+    fdf$mxdis<-mxdis
     fdf$n_dis<-pmin(mxdis,fdf$n_dis)
   } else {
     # Extract, transform then merge data (functions found in 'RCode/Data_Wrangling/')
@@ -41,7 +41,7 @@ execDIFA<-function(method="MCMC",presave=T){
         ConvHe2Tonnes(difa$faostat)
     # Prepare the data to be input into the stan model
     fdf<-Prepare4Model(difa$faostat,sevvies,fyear=fyear,syear=syear,mxdis = mxdis)
-    fdf$mxdis<-dim(fdf$flag)[3]
+    fdf$mxdis<-mxdis
     rm(difa)
   }
   # Train the model

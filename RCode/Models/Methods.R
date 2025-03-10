@@ -114,7 +114,7 @@ TrainModel_MCMLE <- function(fdf, samp = 5000, cpus = 30, LL="m_likelihood", mxd
       beta_dur = params$beta_dur,
       sigma = params$sigma,
       beta_y1 = params$beta_y1,
-      LL = params$LL,
+      LL = params$LL
     ) %>%
       # Unnest vector parameters
       mutate(hsev = list(params$hsev),

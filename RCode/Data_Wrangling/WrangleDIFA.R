@@ -291,6 +291,9 @@ ModMxDis<-function(fdf){
   fdf$flag<-fdf$flag[,,1:fdf$mxdis]
   fdf$hazdur<-fdf$hazdur[,,1:fdf$mxdis]
   fdf$iprox<-fdf$iprox[,1:fdf$mxdis,]
+  fdf$mu_dis<-fdf$mu_dis[,1:fdf$mxdis,]
+  fdf$lnmu_dis<-fdf$lnmu_dis[,1:fdf$mxdis,]
+  fdf$n_dis<-pmin(fdf$mxdis,fdf$n_dis)
   
   return(fdf)
 }
