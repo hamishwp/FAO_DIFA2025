@@ -139,11 +139,15 @@ Complete_Prices <- function(Prices, Prod, FAOSTAT_Item) {
       iso_mu <- mu_price[iso, , , drop = FALSE]
       iso_sig <- sig_price[iso, , , drop = FALSE]
       
-      new_mu <- array(NA, dim = c(1, length(all_years), length(missing_items)),
-                      dimnames = list(iso, all_years, missing_items))
+      new_mu <- array(
+        NA, 
+        dim = c(1, length(all_years), length(missing_items)),
+         dimnames = list(iso, all_years, missing_items))
       
-      new_sig <- array(NA, dim = c(1, length(all_years), length(missing_items)),
-                       dimnames = list(iso, all_years, missing_items))
+      new_sig <- array(
+        NA,
+        dim = c(1, length(all_years), length(missing_items)),
+        dimnames = list(iso, all_years, missing_items))
       
       iso_mu <- abind(iso_mu, new_mu, along = 3)
       iso_sig <- abind(iso_sig, new_sig, along = 3)
