@@ -121,52 +121,49 @@ Complete_Prices <- function(Prices, Prod, FAOSTAT_Item) {
   all_years <- seq(min(Prod$Year), max(Prod$Year))
   all_isos <- unique(Prod$ISO3.CODE)
   
-  for (i in 1:length(all_isos)) {
-    iso <- all_isos[i]
+  for (iso in all_isos) {
     
     if (!(iso %in% rownames(mu_price))) {
       mu_price <- abind(mu_price, array(NA, dim = c(1, length(all_years), length(all_items))), along = 1)
       rownames(mu_price)[nrow(mu_price)] <- iso
       sig_price <- abind(sig_price, array(NA, dim = c(1, length(all_years), length(all_items))), along = 1)
       rownames(sig_price)[nrow(sig_price)] <- iso
+      dimnames(mu_price)[[3]] <- all_items
+      dimnames(sig_price)[[3]] <- all_items
     }
-  
-  current_items <- dimnames(mu_price[iso, , , drop = FALSE])[[3]]
-  missing_items <- setdiff(all_items, current_items)
-  
-  if (length(missing_items) > 0) {
-    iso_mu <- mu_price[iso, , ,drop = FALSE]
-    iso_sig <- sig_price[iso, , ,drop = FALSE]
     
-    new_mu <- array(
-      NA, 
-      dim = c(1, length(all_years), length(missing_items)),
-      dimnames = list(iso, all_years, missing_items)
-      )
+    current_items <- dimnames(mu_price[iso, , , drop = FALSE])[[3]]
+    missing_items <- setdiff(all_items, current_items)
     
-    new_sig <- array(
-      NA, 
-      dim = c(1, length(all_years), length(missing_items)),
-       dimnames = list(iso, all_years, missing_items))
-    
-    iso_mu <- abind(iso_mu, new_mu, along = 3)
-    iso_sig <- abind(iso_sig, new_sig, along = 3)
-    
-    order_index <- match(all_items, dimnames(iso_mu)[[3]])
-    
-    iso_mu <- iso_mu[ , , order_index, drop = FALSE]
-    iso_sig <- iso_sig[ , , order_index, drop = FALSE]
-    
-    mu_price[iso, , ] <- iso_mu[1, , ]
-    sig_price[iso, , ] <- iso_sig[1, , ]
-    
-    dimnames(mu_price)[[3]] <- all_items
-    dimnames(sig_price)[[3]] <- all_items
+    if (length(missing_items) > 0) {
+      iso_mu <- mu_price[iso, , , drop = FALSE]
+      iso_sig <- sig_price[iso, , , drop = FALSE]
+      
+      new_mu <- array(NA, dim = c(1, length(all_years), length(missing_items)),
+                      dimnames = list(iso, all_years, missing_items))
+      
+      new_sig <- array(NA, dim = c(1, length(all_years), length(missing_items)),
+                       dimnames = list(iso, all_years, missing_items))
+      
+      iso_mu <- abind(iso_mu, new_mu, along = 3)
+      iso_sig <- abind(iso_sig, new_sig, along = 3)
+      
+      order_index <- match(all_items, dimnames(iso_mu)[[3]])
+      
+      iso_mu <- iso_mu[, , order_index, drop = FALSE]
+      iso_sig <- iso_sig[, , order_index, drop = FALSE]
+      
+      mu_price[iso, , ] <- iso_mu[1, , ]
+      sig_price[iso, , ] <- iso_sig[1, , ]
+      
+      dimnames(mu_price)[[3]] <- all_items
+      dimnames(sig_price)[[3]] <- all_items
+    }
   }
   
   return(list(mu_price = mu_price, sig_price = sig_price))
 }
-}
+
 
 prices2 <- prices%>%
   Complete_Prices(
@@ -237,3 +234,5 @@ prices3 <- prices2%>%
   ImputeRegion(
     country_region
   )
+
+save(prices3,file = "Prices.RData")
