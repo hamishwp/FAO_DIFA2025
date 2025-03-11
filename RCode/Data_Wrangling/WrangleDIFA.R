@@ -706,6 +706,7 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023, loggy=T, mxdis=15
             mxdis = mxdis,
             time = time,
             isos = isos,
+            commods=commods,
             y = y,
             lny = lny,
             htype = htype,
