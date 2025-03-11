@@ -183,7 +183,7 @@ predict_y_bin <- function(fdf, params, mxdis=1) {
 }
 
 # Calculate the default model likelihood - log production values
-predict_losses_bin <- function(fdf, params, mxdis=1, n_sam=1000) {
+predloss_bin <- function(fdf, params, mxdis=1, n_sam=1000) {
   # Initialise log-likelihood
   loglk<-0
   fdf$n_dis<-pmin(mxdis,fdf$n_dis)
