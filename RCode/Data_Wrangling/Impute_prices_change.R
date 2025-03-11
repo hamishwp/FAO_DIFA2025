@@ -10,14 +10,14 @@ library(pracma)
 library(data.table)
 library(FAOSTAT)
 
-DATA <- readRDS("C:/Users/ignac/Desktop/FAO_DIFA2025/Data/Results/difa2025.RData")
-faostat <- DATA$faostat
+difa <- readRDS("C:/Users/ignac/Desktop/FAO_DIFA2025/Data/Results/difa2025.RData")
+faostat <- difa$faostat
 
-ImputePrices <- function(price_df, missthresh_GPR = 0.3, missthresh_nearest = 0.6) {
-  all_items <- unique(price_df$item_grouping_f)
+ImputePrices <- function(price_df, all_isos, missthresh_GPR = 0.3, missthresh_nearest = 0.6) {
+  all_items <- sort(unique(price_df$item_grouping_f))
   all_years <- seq(min(price_df$Year), max(price_df$Year))
   total_years <- length(all_years)
-  all_isos <- unique(price_df$ISO3.CODE)
+  all_isos %<>% sort()
   
   mu_price <- array(NA, dim = c(length(all_isos), length(all_years), length(all_items)), 
                     dimnames = list(all_isos, all_years, all_items))
@@ -92,7 +92,7 @@ prices <- faostat$price %>%
         ISO3.CODE,
         Item,
         Year = as.numeric(Year),
-        Log_Prod = log(Production)
+        Log_Prod = log(Production+1)
       ),
     by = c("ISO3.CODE", "Item", "Year")
   ) %>%
@@ -110,71 +110,9 @@ prices <- faostat$price %>%
   mutate(
     Price17eq = fifelse(is.nan(Price17eq),NA,Price17eq)
   )%>%
-  ImputePrices()
+  ImputePrices(all_isos = sort(unique(faostat$Prod$ISO3.CODE)))
 
-Complete_Prices <- function(Prices, Prod, FAOSTAT_Item) {
-  
-  mu_price <- Prices$mu_price
-  sig_price <- Prices$sig_price
-  
-  all_items <- unique(FAOSTAT_Item$item_grouping_f)
-  all_years <- seq(min(Prod$Year), max(Prod$Year))
-  all_isos <- unique(Prod$ISO3.CODE)
-  
-  for (iso in all_isos) {
-    
-    if (!(iso %in% rownames(mu_price))) {
-      mu_price <- abind(mu_price, array(NA, dim = c(1, length(all_years), length(all_items))), along = 1)
-      rownames(mu_price)[nrow(mu_price)] <- iso
-      sig_price <- abind(sig_price, array(NA, dim = c(1, length(all_years), length(all_items))), along = 1)
-      rownames(sig_price)[nrow(sig_price)] <- iso
-      dimnames(mu_price)[[3]] <- all_items
-      dimnames(sig_price)[[3]] <- all_items
-    }
-    
-    current_items <- dimnames(mu_price[iso, , , drop = FALSE])[[3]]
-    missing_items <- setdiff(all_items, current_items)
-    
-    if (length(missing_items) > 0) {
-      iso_mu <- mu_price[iso, , , drop = FALSE]
-      iso_sig <- sig_price[iso, , , drop = FALSE]
-      
-      new_mu <- array(
-        NA, 
-        dim = c(1, length(all_years), length(missing_items)),
-         dimnames = list(iso, all_years, missing_items))
-      
-      new_sig <- array(
-        NA,
-        dim = c(1, length(all_years), length(missing_items)),
-        dimnames = list(iso, all_years, missing_items))
-      
-      iso_mu <- abind(iso_mu, new_mu, along = 3)
-      iso_sig <- abind(iso_sig, new_sig, along = 3)
-      
-      order_index <- match(all_items, dimnames(iso_mu)[[3]])
-      
-      iso_mu <- iso_mu[, , order_index, drop = FALSE]
-      iso_sig <- iso_sig[, , order_index, drop = FALSE]
-      
-      mu_price[iso, , ] <- iso_mu[1, , ]
-      sig_price[iso, , ] <- iso_sig[1, , ]
-      
-      dimnames(mu_price)[[3]] <- all_items
-      dimnames(sig_price)[[3]] <- all_items
-    }
-  }
-  
-  return(list(mu_price = mu_price, sig_price = sig_price))
-}
-
-
-prices2 <- prices%>%
-  Complete_Prices(
-    Prod = faostat$Prod%>%filter(Year >= 1991), 
-    FAOSTAT_Item = faostat$item_groups
-    )
-
+# Extract the countries and their associated regions, sub-regions, etc
 country_region = read.csv("Data/RawData/country_region.csv")%>% 
   select(
     - X
@@ -196,6 +134,7 @@ ImputeRegion <- function(prices, country_region) {
     for (k in seq_along(items)) {
       prices_vec <- mu_price[, j, k]
       global_median <- if (all(is.na(prices_vec))) NA else median(prices_vec, na.rm = TRUE)
+      global_mad <- if (all(is.na(prices_vec))) NA else mad(prices_vec, na.rm = TRUE)
       
       sub_regions <- unique(iso2sub[isos])
       sub_regions <- sub_regions[!is.na(sub_regions)]
@@ -203,6 +142,11 @@ ImputeRegion <- function(prices, country_region) {
         indices <- which(iso2sub[isos] == subr)
         vec <- prices_vec[indices]
         if (all(is.na(vec))) NA else median(vec, na.rm = TRUE)
+      })
+      subregion_mads <- sapply(sub_regions, function(subr) {
+        indices <- which(iso2sub[isos] == subr)
+        vec <- prices_vec[indices]
+        if (all(is.na(vec))) NA else mad(vec, na.rm = TRUE)
       })
       
       macro_regions <- unique(iso2macro[isos])
@@ -212,31 +156,117 @@ ImputeRegion <- function(prices, country_region) {
         vec <- prices_vec[indices]
         if (all(is.na(vec))) NA else median(vec, na.rm = TRUE)
       })
+      macro_mads <- sapply(macro_regions, function(macro) {
+        indices <- which(iso2macro[isos] == macro)
+        vec <- prices_vec[indices]
+        if (all(is.na(vec))) NA else mad(vec, na.rm = TRUE)
+      })
       
       for (i in seq_along(isos)) {
-        if (is.na(mu_price[i, j, k])) {
+        if (is.na(mu_price[i, j, k]) | mu_price[i, j, k]<1e-6) {
           subr <- iso2sub[isos[i]]
           macro <- iso2macro[isos[i]]
-          imputed_val <- if (!is.na(subr) && !is.na(subregion_medians[subr])) {
-            subregion_medians[subr]
-          } else if (!is.na(macro) && !is.na(macro_medians[macro])) {
-            macro_medians[macro]
+          if (!is.na(subr) && !is.na(subregion_medians[subr]) & subregion_medians[subr]!=0) {
+            imp_med <- subregion_medians[subr]
+            imp_mad <- subregion_mads[subr]
+          } else if (!is.na(macro) && !is.na(macro_medians[macro]) & macro_medians[macro]!=0) {
+            imp_med <- macro_medians[macro]
+            imp_mad <- macro_mads[macro]
           } else {
-            global_median
+            imp_med <- global_median
+            imp_mad <- global_mad
           }
-          mu_price[i, j, k] <- imputed_val
+          names(imp_med)<-names(imp_mad)<-NULL
+          mu_price[i, j, k] <- imp_med
+          sig_price[i, j, k] <- imp_mad
         }
       }
     }
   }
   
-  
   return(list(mu_price = mu_price, sig_price = sig_price))
 }
 
-prices3 <- prices2%>%
+prices%<>%
   ImputeRegion(
     country_region
   )
 
-save(prices3,file = "Prices.RData")
+save(prices,file = "Prices.RData")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Complete_Prices <- function(Prices, Prod, FAOSTAT_Item) {
+#   
+#   mu_price <- Prices$mu_price
+#   sig_price <- Prices$sig_price
+#   
+#   all_items <- sort(unique(FAOSTAT_Item$item_grouping_f))
+#   all_years <- seq(min(Prod$Year), max(Prod$Year))
+#   all_isos <- sort(unique(Prod$ISO3.CODE))
+#   
+#   for (iso in all_isos) {
+#     
+#     if (!(iso %in% rownames(mu_price))) {
+#       mu_price <- abind::abind(mu_price, array(NA, dim = c(1, length(all_years), length(all_items))), along = 1)
+#       rownames(mu_price)[nrow(mu_price)] <- iso
+#       sig_price <- abind::abind(sig_price, array(NA, dim = c(1, length(all_years), length(all_items))), along = 1)
+#       rownames(sig_price)[nrow(sig_price)] <- iso
+#       dimnames(mu_price)[[3]] <- all_items
+#       dimnames(sig_price)[[3]] <- all_items
+#     }
+#     
+#     current_items <- dimnames(mu_price[iso, , , drop = FALSE])[[3]]
+#     missing_items <- setdiff(all_items, current_items)
+#     
+#     if (length(missing_items) > 0) {
+#       iso_mu <- mu_price[iso, , , drop = FALSE]
+#       iso_sig <- sig_price[iso, , , drop = FALSE]
+#       
+#       new_mu <- array(
+#         NA, 
+#         dim = c(1, length(all_years), length(missing_items)),
+#          dimnames = list(iso, all_years, missing_items))
+#       
+#       new_sig <- array(
+#         NA,
+#         dim = c(1, length(all_years), length(missing_items)),
+#         dimnames = list(iso, all_years, missing_items))
+#       
+#       iso_mu <- abind::abind(iso_mu, new_mu, along = 3)
+#       iso_sig <- abind::abind(iso_sig, new_sig, along = 3)
+#       
+#       order_index <- match(all_items, dimnames(iso_mu)[[3]])
+#       
+#       iso_mu <- iso_mu[, , order_index, drop = FALSE]
+#       iso_sig <- iso_sig[, , order_index, drop = FALSE]
+#       
+#       mu_price[iso, , ] <- iso_mu[1, , ]
+#       sig_price[iso, , ] <- iso_sig[1, , ]
+#       
+#       dimnames(mu_price)[[3]] <- all_items
+#       dimnames(sig_price)[[3]] <- all_items
+#     }
+#   }
+#   
+#   return(list(mu_price = mu_price, sig_price = sig_price))
+# }
+
+
+# prices2 <- prices%>%
+#   Complete_Prices(
+#     Prod = faostat$Prod%>%filter(Year >= syear & Year <=fyear), 
+#     FAOSTAT_Item = faostat$item_groups
+#     )
