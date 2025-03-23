@@ -259,3 +259,184 @@ ggsave("./Plots/RegionLosses_NoDis.png",p,height=7,width=10)
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+oldie<-read.csv("./Data/Results/OLD_loss_estimated_2021.csv")
+current<-readRDS("./Data/Results/EMDAT-UCDP_DisSev.RData")
+
+oldie%>%
+  group_by(unsd_macro_reg)%>%
+  reframe(loss=sum(prod_loss,na.rm = T))%>%
+  ggplot(aes(unsd_macro_reg,loss))+geom_col()
+
+oldie%>%
+  group_by(unsd_macro_reg,country,disaster_type,year)%>%
+  reframe(loss=sum(prod_loss,na.rm = T))%>%
+  ggplot(aes(unsd_macro_reg,fill=unsd_macro_reg))+geom_bar()
+
+oldie%>%
+  group_by(unsd_macro_reg,country,disaster_type,year)%>%
+  reframe(loss=log(sum(prod_loss,na.rm = T)))%>%
+  ggplot()+geom_boxplot(aes(unsd_macro_reg,loss))
+
+colnames(current)
+
+current%>%group_by(region,ISO3,haz_Ab,year)%>%
+  reframe(loss=log(sum(exp(mu))))%>%
+  ggplot(aes(region))+geom_bar()
+
+current%>%group_by(region,disno)%>%
+  reframe(loss=log(sum(exp(mu))))%>%
+  ggplot(aes(region))+geom_bar()
+
+current%>%
+  filter(region%in%c("Africa","Americas","Asia","Europe","Oceania"))%>%
+  arrange(desc(mu))%>%
+  group_by(ISO3)%>%
+  slice(1:15)%>%ungroup()%>%
+  group_by(region,disno)%>%
+  reframe(loss=log(sum(exp(mu))))%>%
+  ggplot(aes(region,fill=region))+geom_bar()
+
+current%>%
+  ggplot()+geom_boxplot(aes(region,mu))
+
+
+p<-oldie%>%
+  group_by(unsd_macro_reg,country,disaster_type,year)%>%
+  reframe(loss=sum(prod_loss,na.rm = T))%>%
+  ggplot(aes(unsd_macro_reg,fill=unsd_macro_reg))+geom_bar()+
+  xlab("Region")+ylab("No. Disasters")+labs(fill="Region")+
+  ggtitle("Previous Method: All Disasters")
+
+q<-current%>%
+  mutate(region=case_when(region=="Northern America" ~ "Americas", T ~ region))%>%
+  filter(region%in%c("Africa","Americas","Asia","Europe","Oceania"))%>%
+  arrange(desc(mu))%>%
+  group_by(ISO3)%>%
+  slice(1:15)%>%ungroup()%>%
+  group_by(region,disno)%>%
+  reframe(loss=log(sum(exp(mu))))%>%
+  ggplot(aes(region,fill=region))+geom_bar()+
+  xlab("Region")+ylab("No. Disasters")+labs(fill="Region")+
+  ggtitle("Current Method: Top-15 Disasters")
+
+fig<-gridExtra::grid.arrange(p,q,ncol=2)
+
+ggsave("./Plots/DisasterRegion_Comp_OldVsNew.png",fig,height=5,width=12)
+
+
+# Number of events per country - China will dominate - then rank by top 30
+
+oldie%>%
+  group_by(unsd_macro_reg,country,disaster_type,year)%>%
+  reframe(loss=sum(prod_loss,na.rm = T))%>%
+  group_by(unsd_macro_reg,country)%>%
+  reframe(N=n())%>%
+  arrange(desc(N))%>%
+  View()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+emdat<-readRDS("./Data/Results/EMDAT_DisSev2.RData")
+
+emdat<-API_EMDAT(1970,2024)
+
+p<-emdat%>%
+  mutate(haz_grp=case_when(haz_Ab%in%c("FL") ~ "Floods", 
+                           haz_Ab%in%c("EQ") ~ "Earthquakes"),
+         year=year(sdate))%>%
+  filter(!is.na(haz_grp) & year<2024)%>%
+  group_by(haz_grp,year)%>%
+  reframe(count=n())%>%
+  ggplot(aes(year,count,group=haz_grp)) +
+  geom_point(aes(colour=haz_grp)) +
+  geom_smooth(aes(colour=haz_grp),se = F) +
+  scale_y_log10() +
+  labs(colour="Hazard Type")+xlab("Year")+ylab("No. Disasters Recorded")+
+  ggtitle("No. Disasters Recorded per Year in EM-DAT")
+ggsave("./Plots/imptrends.png",p,height=4,width=7)
+
+
