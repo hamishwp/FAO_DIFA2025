@@ -278,6 +278,120 @@ predloss_bin_par <- function(fdf, params, mxdis = 1, n_sam = 1000, n_cores = 4) 
   return(list(losses = losses, all_losses = all_losses))
 }
 
+# Parallelised version of the above function to predict commodity losses
+predloss_def_par <- function(fdf, params, mxdis = 1, n_sam = 1000, n_cores = 4) {
+  # Reduce the number of disasters to max mxdis
+  fdf$n_dis <- pmin(mxdis, fdf$n_dis)
+  # Precompute gamma parameters
+  alpha <- fdf$mu_prices^2 / fdf$sig_prices^2  # shape parameter
+  lambda <- fdf$mu_prices / fdf$sig_prices^2  # rate parameter
+  # Function to compute for a single country
+  compute_country_losses <- function(iso) {
+    lnmu_AR1 <- fdf$lnmu_AR1[iso, ]
+    lnsig_AR1 <- fdf$lnsig_AR1[iso, ]
+    # Store country-specific losses
+    country_losses <- array(0, dim = c(fdf$n_t, fdf$n_com, n_sam))
+    country_all_losses <- matrix(0, nrow = fdf$n_com, ncol = n_sam)
+    # Iterate over years
+    for (ttt in 2:fdf$n_t) {
+      if (sum(fdf$flag[iso, ttt, 1:fdf$n_dis[iso]]) != 0 &&
+          sum(fdf$iprox[iso, 1:fdf$n_dis[iso], ]) != 0) {
+        # Calculate disaster severity efficiently
+        dsev <- sapply(1:fdf$n_com, function(k) {
+          mean(fdf$iprox[iso, 1:fdf$n_dis[iso], k] *
+                 params$hsev[fdf$htype[iso, 1:fdf$n_dis[iso]]])
+        })
+        # Iterate over commodities
+        for (k in 1:fdf$n_com) {
+          # Production with and without disaster
+          ydis <- params$beta_dis * dsev[k] * params$isev[k] +
+            params$beta_y1 * lnmu_AR1[k] * fdf$lny[iso, ttt - 1, k]
+          ynodis <- params$beta_y1 * lnmu_AR1[k] * fdf$lny[iso, ttt - 1, k]
+          # Sample production value with gamma uncertainty
+          gamma_samples <- rgamma(n_sam, shape = alpha[iso, ttt, k], rate = lambda[iso, ttt, k])
+          # Compute losses
+          loss_values <- (exp(ynodis) - exp(ydis)) * gamma_samples
+          country_losses[ttt, k, ] <- loss_values
+          # Aggregate losses
+          country_all_losses[k, ] <- country_all_losses[k, ] + loss_values
+        }
+      }
+    }
+    
+    list(country_losses = country_losses, country_all_losses = country_all_losses)
+  }
+  # Parallelise and run
+  country_results <- parallel::mclapply(1:fdf$n_isos, compute_country_losses, mc.cores = ncores)
+  
+  # Combine results back into arrays
+  losses <- array(0, dim = c(fdf$n_isos, fdf$n_t, fdf$n_com, n_sam))
+  all_losses <- matrix(0, nrow = fdf$n_com, ncol = n_sam)
+  
+  for (iso in 1:fdf$n_isos) {
+    losses[iso, , , ] <- country_results[[iso]]$country_losses
+    all_losses <- all_losses + country_results[[iso]]$country_all_losses
+  }
+  
+  return(list(losses = losses, all_losses = all_losses))
+}
+
+# Parallelised version of the above function to predict commodity losses
+predloss_hazdur_par <- function(fdf, params, mxdis = 1, n_sam = 1000, n_cores = 4) {
+  # Reduce the number of disasters to max mxdis
+  fdf$n_dis <- pmin(mxdis, fdf$n_dis)
+  # Precompute gamma parameters
+  alpha <- fdf$mu_prices^2 / fdf$sig_prices^2  # shape parameter
+  lambda <- fdf$mu_prices / fdf$sig_prices^2  # rate parameter
+  # Function to compute for a single country
+  compute_country_losses <- function(iso) {
+    lnmu_AR1 <- fdf$lnmu_AR1[iso, ]
+    lnsig_AR1 <- fdf$lnsig_AR1[iso, ]
+    # Store country-specific losses
+    country_losses <- array(0, dim = c(fdf$n_t, fdf$n_com, n_sam))
+    country_all_losses <- matrix(0, nrow = fdf$n_com, ncol = n_sam)
+    # Iterate over years
+    for (ttt in 2:fdf$n_t) {
+      if (sum(fdf$flag[iso, ttt, 1:fdf$n_dis[iso]]) != 0 &&
+          sum(fdf$iprox[iso, 1:fdf$n_dis[iso], ]) != 0) {
+        # Calculate disaster severity efficiently
+        dsev <- sapply(1:fdf$n_com, function(k) {
+          mean(fdf$iprox[iso, 1:fdf$n_dis[iso], k] * 
+                 (1 + fdf$hazdur[iso,ttt,1:fdf$n_dis[iso]]*params$beta_dur) *
+                 params$hsev[fdf$htype[iso, 1:fdf$n_dis[iso]]])
+        })
+        # Iterate over commodities
+        for (k in 1:fdf$n_com) {
+          # Production with and without disaster
+          ydis <- params$beta_dis * dsev[k] * params$isev[k] +
+            params$beta_y1 * lnmu_AR1[k] * fdf$lny[iso, ttt - 1, k]
+          ynodis <- params$beta_y1 * lnmu_AR1[k] * fdf$lny[iso, ttt - 1, k]
+          # Sample production value with gamma uncertainty
+          gamma_samples <- rgamma(n_sam, shape = alpha[iso, ttt, k], rate = lambda[iso, ttt, k])
+          # Compute losses
+          loss_values <- (exp(ynodis) - exp(ydis)) * gamma_samples
+          country_losses[ttt, k, ] <- loss_values
+          # Aggregate losses
+          country_all_losses[k, ] <- country_all_losses[k, ] + loss_values
+        }
+      }
+    }
+    
+    list(country_losses = country_losses, country_all_losses = country_all_losses)
+  }
+  # Parallelise and run
+  country_results <- parallel::mclapply(1:fdf$n_isos, compute_country_losses, mc.cores = ncores)
+  
+  # Combine results back into arrays
+  losses <- array(0, dim = c(fdf$n_isos, fdf$n_t, fdf$n_com, n_sam))
+  all_losses <- matrix(0, nrow = fdf$n_com, ncol = n_sam)
+  
+  for (iso in 1:fdf$n_isos) {
+    losses[iso, , , ] <- country_results[[iso]]$country_losses
+    all_losses <- all_losses + country_results[[iso]]$country_all_losses
+  }
+  
+  return(list(losses = losses, all_losses = all_losses))
+}
 
 simulate_fdf <- function(fdf, params) {
   # Initialise simulated lny data with the real first values
@@ -352,7 +466,7 @@ InitParams<-function(fdf, iprox_dat=T, GPR=F, empAR=F){
   
   return(function(chainnum){
     list(beta_dis = 0,
-         beta_dur = 1,
+         beta_dur = 0.01,
          hsev = rep(1,fdf$n_haz),
          isev = rep(1,fdf$n_com),
          beta_muAR1 = 1,

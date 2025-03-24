@@ -106,8 +106,8 @@ ConvHe2Tonnes<-function(sevvies,faostat){
   sevvies%>%filter(!is.na(mu) & !is.na(sd) & dep=="crops")%>%dplyr::select(-dep)%>%
     left_join(heprod,by=join_by(ISO3==ISO3.CODE),
               relationship = "many-to-many")%>%
-    mutate(mu=log(exp(mu)*propprod*avyield),
-           sd=log(exp(sd)*propprod*avyield))%>%
+    mutate(mu=log(exp(mu)*propprod*avyield+10),
+           sd=log(exp(sd)*propprod*avyield+10))%>%
     dplyr::select(-any_of(c("avyield","propprod","proportion")))
 }
 
@@ -615,6 +615,8 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023, loggy=T, mxdis=15
     }
     # Filter only the relevant disaster severity records
     isosev<-redsev%>%filter(ISO3==is)
+    # We need all commodities to have values (this error is very rare but I don't have time to treat it)
+    isosev%<>%filter(disno%in%as.integer(names(table(isosev$disno))[table(isosev$disno)==6]))
     # Compute AR(1) estimates (phi and sigma) with pre-filled zeros
     for(k in 1:n_com){
       yy<-y[j, ,k]

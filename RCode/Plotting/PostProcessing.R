@@ -1,7 +1,7 @@
 results_df<-data.frame()
 for (mxie in c(1,3,5,10,15,30)){
   for (llie in c("m_likelihood_hazdur","m_likelihood","m_likelihood_bin")){
-    mcmle<-TrainModel_MCMLE(fdf, samp = 30000, cpus = 30, LL = llie, mxdis = mxie)
+    mcmle<-TrainModel_MCMLE(fdf, samp = 30000, cpus = 35, LL = llie, mxdis = mxie)
     ressies<-compute_weighted_stats(mcmle)
     ressies%<>%mutate(model=llie,mxdis=mxie, q95LL=quantile(mcmle$LL,probs = 0.95))
     results_df%<>%rbind(ressies)
@@ -82,18 +82,20 @@ ressies<-readRDS("./Data/Results/results_df_MCMLE.RData")
 results_df <- ressies%>%filter(model=="m_likelihood_bin" & mxdis==1)
 country_region = openxlsx::read.xlsx("Data/Taxonomies/IsoContinentRegion.xlsx")%>% 
   dplyr::select(ISO.Code, Country, UN.Region, UN.Sub.Region, World.Bank.Income.Groups)%>%rename(ISO3=ISO.Code)
+funcy<-predloss_bin_par
 
 global<-itemres<-isores<-data.frame()
 # Cycle over different number of disasters
 for(i in 1:15){
   params<-readRDS("./Data/Results/params_binLL_mxdis1.RData")
-  losses<-predloss_bin_par(fdf, params, mxdis=i, n_sam=1000)
+  # params<-params_save
+  losses<-funcy(fdf, params, mxdis=i, n_sam=1000)
   params$beta_dis <- convert_results_to_params(results_df, fdf, "w_q75")$beta_dis
-  tmp<-predloss_bin_par(fdf, params, mxdis=i, n_sam=1000)
+  tmp<-funcy(fdf, params, mxdis=i, n_sam=1000)
   losses$losses <- abind::abind(losses$losses, tmp$losses, along = 4)
   losses$all_losses <- abind::abind(losses$all_losses, tmp$all_losses, along = 2)
   params$beta_dis <- convert_results_to_params(results_df, fdf, "w_q25")$beta_dis
-  tmp<-predloss_bin_par(fdf, params, mxdis=i, n_sam=1000)
+  tmp<-funcy(fdf, params, mxdis=i, n_sam=1000)
   losses$losses <- abind::abind(losses$losses, tmp$losses, along = 4)
   losses$all_losses <- abind::abind(losses$all_losses, tmp$all_losses, along = 2)
   
@@ -119,7 +121,7 @@ for(i in 1:15){
     left_join(country_region,by="ISO3",relationship="one-to-one"))
 }
 
-dis_nt<-data.frame(ndis=1:15, tdis=sapply(1:15,function(i) sum(pmin(fdf$n_dis,i))))
+dis_nt<-data.frame(ndis=1:30, tdis=sapply(1:30,function(i) sum(pmin(fdf$n_dis,i))))
 
 # Function to smooth the values
 smooth_values <- function(data, x_var, y_vars, span = 0.9) {
@@ -141,6 +143,33 @@ smooth_values_group <- function(df, span = 0.9) {
     )
 }
 
+global%<>%left_join(dis_nt,by="ndis",relationship="many-to-one")
+
+p <- global%>% 
+  ggplot(aes(x = tdis)) +
+  geom_ribbon(aes(ymin = Q05, ymax = Q95, fill = "90% CI"), alpha = 0.2) +  # Smoothed Ribbon
+  geom_line(aes(y = Mean, colour = "Mean"), size = 1) +  # Smoothed Mean
+  geom_line(aes(y = Q05, colour = "Q05"), linetype = "dashed") +  # Smoothed Q05
+  geom_line(aes(y = Q95, colour = "Q95"), linetype = "dashed") +  # Smoothed Q95
+  scale_colour_manual(values = c("Mean" = "black", "Q05" = "blue", "Q95" = "blue")) + 
+  scale_fill_manual(values = c("90% CI" = "blue")) + 
+  # scale_x_continuous(
+  #   name = "Total Disasters Included",  # Lower x-axis label (tdis)
+  #   sec.axis = sec_axis(~ ndis_to_tdis_transform(.), 
+  #                       name = "Number of Disasters per Country",
+  #                       breaks=c(3,6,9,12),
+  #                       labels=c(3,6,9,12))  # Upper x-axis (ndis)
+  # ) +
+  labs(y = "Losses [Trillion USD-2017]",
+       title = "Agricultural & Food Losses by No. Disasters Included",
+       colour = "Metrics",
+       fill = "Confidence Interval") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(hjust = 1),  # Rotate x labels
+        plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
+        legend.position = "right",
+        axis.title.x.top = element_text(margin = margin(b = 10)),  # Space for upper axis
+        axis.title.x.bottom = element_text(margin = margin(t = 10)));p
 
 # Apply smoothing function
 global_smooth <- smooth_values(global, "ndis", c("Mean", "Q05", "Q95"))
@@ -153,19 +182,19 @@ ndis_to_tdis_transform <- function(tdis_val) {
   predict(ndis_to_tdis_model, newdata = data.frame(tdis = tdis_val))
 }
 # Plot it with two axis: total no disasters and number of disasters per country
-p <- ggplot(global_smooth, aes(x = tdis)) +
-  geom_ribbon(aes(ymin = Q05_smooth, ymax = Q95_smooth, fill = "90% CI"), alpha = 0.2) +  # Smoothed Ribbon
-  geom_line(aes(y = Mean_smooth, colour = "Mean"), size = 1) +  # Smoothed Mean
-  geom_line(aes(y = Q05_smooth, colour = "Q05"), linetype = "dashed") +  # Smoothed Q05
-  geom_line(aes(y = Q95_smooth, colour = "Q95"), linetype = "dashed") +  # Smoothed Q95
+p <- ggplot(global, aes(x = tdis)) +
+  geom_ribbon(aes(ymin = Q05, ymax = Q95, fill = "90% CI"), alpha = 0.2) +  # Smoothed Ribbon
+  geom_line(aes(y = Mean, colour = "Mean"), size = 1) +  # Smoothed Mean
+  geom_line(aes(y = Q05, colour = "Q05"), linetype = "dashed") +  # Smoothed Q05
+  geom_line(aes(y = Q95, colour = "Q95"), linetype = "dashed") +  # Smoothed Q95
   scale_colour_manual(values = c("Mean" = "black", "Q05" = "blue", "Q95" = "blue")) + 
   scale_fill_manual(values = c("90% CI" = "blue")) + 
   scale_x_continuous(
     name = "Total Disasters Included",  # Lower x-axis label (tdis)
     sec.axis = sec_axis(~ ndis_to_tdis_transform(.), 
                         name = "Number of Disasters per Country",
-                        breaks=c(3,6,9,12),
-                        labels=c(3,6,9,12))  # Upper x-axis (ndis)
+                        breaks=c(5,10,15,20,25),
+                        labels=c(5,10,15,20,25))  # Upper x-axis (ndis)
   ) +
   labs(y = "Losses [Trillion USD-2017]",
        title = "Agricultural & Food Losses by No. Disasters Included",
@@ -190,13 +219,13 @@ itemres_smooth <- itemres %>%
     Q95 = sum(Q95, na.rm = TRUE),
     .groups = "drop"
   ) %>%
-  filter(!is.na(ndis) & !is.na(tdis) & !is.na(Mean) & !is.na(Q05) & !is.na(Q95)) %>%
-  group_split(Item_Group) %>%  # Split data by Item_Group
-  map_dfr(smooth_values_group)
+  filter(!is.na(ndis) & !is.na(tdis) & !is.na(Mean) & !is.na(Q05) & !is.na(Q95)) #%>%
+  # group_split(Item_Group) %>%  # Split data by Item_Group
+  # map_dfr(smooth_values_group)
 # Plot with multiple commodity lines
-p <- ggplot(itemres_smooth, aes(x = tdis, colour = Item_Group)) +
+p <- ggplot(itemres, aes(x = tdis, colour = Item_Group)) +
   # geom_ribbon(aes(ymin = Q05_smooth, ymax = Q95_smooth, fill = "90% CI"), alpha = 0.2, inherit.aes = FALSE) +  
-  geom_line(aes(y = Mean_smooth, group = Item_Group), size = 1) +  
+  geom_line(aes(y = Mean, group = Item_Group), size = 1) +  
   scale_colour_manual(values = c("red", "blue", "green", "purple", "orange", "brown", "pink")) +  
   scale_fill_manual(values = c("90% CI" = "blue")) + 
   scale_x_continuous(
@@ -218,11 +247,39 @@ p <- ggplot(itemres_smooth, aes(x = tdis, colour = Item_Group)) +
         axis.title.x.bottom = element_text(margin = margin(t = 10)));p
 ggsave("./Plots/CommodityLosses_NoDis.png",p,height=7,width=10)
 
+
+p<-isores%>%
+  filter(ndis==5)%>%
+  mutate(UN.Region = case_when(is.na(UN.Region) ~ "Not Classified", 
+                                      grepl("america",UN.Region,ignore.case = T) ~ "Americas",
+                                      T ~ UN.Region)) %>%  # Assign NA to "Not Classified"
+  filter(UN.Region!="Not Classified")%>%
+  group_by(UN.Region) %>%  # Ensure summation by region
+  reframe(
+    Mean = sum(Mean, na.rm = TRUE),
+    Q05 = sum(Q05, na.rm = TRUE),
+    Q95 = sum(Q95, na.rm = TRUE)
+  ) %>%
+  filter(!is.na(Mean) & !is.na(Q05) & !is.na(Q95))%>%
+  ggplot(aes(x = UN.Region, y = Mean, fill = UN.Region)) +
+  geom_bar(stat = "identity", width = 0.7, color = "black") +  # Bar plot
+  geom_errorbar(aes(ymin = Q05, ymax = Q95), width = 0.2) +   # Error bars
+  # theme_minimal() +  # Clean theme
+  labs(y = "Losses [Trillion USD-2017]",
+       x = "Region",
+       title = "Estimated Agricultural & Food Losses by Region",
+       fill = "Region") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),  # Rotate x labels
+        plot.title = element_text(size = 14, face = "bold", hjust = 0.5));p
+ggsave("./Plots/RegionLosses_5dis.png",p,height=5,width=7)
+
 # Now for regions
 # Apply smoothing function to each Item_Group separately
 isores_smooth <- isores %>%
   left_join(dis_nt, by = "ndis", relationship = "many-to-one") %>%
-  mutate(UN.Region = ifelse(is.na(UN.Region), "Not Classified", UN.Region)) %>%  # Assign NA to "Not Classified"
+  mutate(UN.Region = case_when(is.na(UN.Region) ~ "Not Classified", 
+                               grepl("america",UN.Region,ignore.case = T) ~ "Americas",
+                               T ~ UN.Region)) %>%  # Assign NA to "Not Classified"
   group_by(UN.Region, tdis, ndis) %>%  # Ensure summation by region
   reframe(
     Mean = sum(Mean, na.rm = TRUE),
@@ -239,8 +296,8 @@ p <- ggplot(isores_smooth, aes(x = tdis, colour = UN.Region)) +
   scale_colour_manual(values = c("red", "blue", "green", "purple", "orange", "brown", "pink")) +  
   scale_fill_manual(values = c("90% CI" = "blue")) + 
   scale_x_continuous(
-    name = "Total Disasters Included",  
-    sec.axis = sec_axis(~ ndis_to_tdis_transform(.), 
+    name = "Total Disasters Included",
+    sec.axis = sec_axis(~ ndis_to_tdis_transform(.),
                         name = "Number of Disasters per Country",
                         breaks = c(3,6,9,12),
                         labels = c(3,6,9,12))
@@ -385,10 +442,23 @@ oldie%>%
   group_by(unsd_macro_reg,country)%>%
   reframe(N=n())%>%
   arrange(desc(N))%>%
-  View()
+  slice(1:20)%>%
+  write_csv2("./Data/NoEvs_EMDAT_UCDP_OLD.csv")
 
+current%>%
+  mutate(region=case_when(region=="Northern America" ~ "Americas", T ~ region))%>%
+  filter(region%in%c("Africa","Americas","Asia","Europe","Oceania"))%>%
+  arrange(desc(mu))%>%
+  group_by(region,ISO3,disno)%>%
+  reframe(loss=log(sum(exp(mu))))%>%
+  ungroup()%>%
+  group_by(region,ISO3)%>%
+  reframe(N=n())%>%
+  arrange(desc(N))%>%
+  slice(1:20)%>%
+  write_csv2("./Data/NoEvs_EMDAT_UCDP.csv")
 
-
+# 
 
 
 
