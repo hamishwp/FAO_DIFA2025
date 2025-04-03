@@ -5,9 +5,11 @@ Welcome to the GitHub repository for the DIFA Report for the United Nations Food
 This code base was developed by:
 - Hamish Patten
 - Ignacio Acosta
+
 With the original DIFA methodology code base developed also with:
 - Priti Rajagopalan
 - Nina Deliu
+
 With non-coding support from the FAO Statistics Division, including:
 - Piero Conforti
 - Zehra Zaidi
