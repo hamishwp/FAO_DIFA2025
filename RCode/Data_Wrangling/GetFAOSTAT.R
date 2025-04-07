@@ -68,23 +68,29 @@ GetFAOSTAT_Prod<-function(syear=1990,fyear=NULL){
   unzip(outloc,exdir = str_split(outloc,".zip",simplify = T)[1,1])
   
   # Load the data
-  DATA <- read.csv("./Data/RawData/FAOSTAT/Production_Crops_Livestock_E_All_Data.csv")%>%
-    select(
-      -matches(
-        "F$|N$"
-        )
-      )%>%
+  DATA <- read.csv("./Data/RawData/FAOSTAT/Production_Crops_Livestock_E_All_Data.csv") %>%
+    select(-matches("N$")) %>%
+    mutate(across(matches("^Y"), as.character)) %>%  
     pivot_longer(
-      cols = starts_with("Y"), 
-      names_to = "Year",   
-      values_to = "Value"  
-    )%>%
+      cols = matches("^Y"),
+      names_to = "YearType",
+      values_to = "temp_value"
+    ) %>%
     mutate(
-      Year = str_remove(Year, "^Y")
-      )%>%
+      Year = str_extract(YearType, "\\d{4}"),
+      Type = if_else(str_detect(YearType, "F$"), "FLAG", "Value")
+    ) %>%
+    select(-YearType) %>%
+    pivot_wider(
+      names_from = Type,
+      values_from = temp_value
+    ) %>%
     filter(
       Year >= syear,
       Year <= fyear
+    ) %>%
+    mutate(
+      Value = as.numeric(Value)  
     )
   
   CleanFAOSTAT(DATA)
@@ -375,7 +381,8 @@ CleanFAOSTAT <- function(FAOSTAT){
       ISO3.CODE,
       Item,
       Year,
-      Yield
+      Yield,
+      FLAG
     )%>%
     arrange(
       ISO3.CODE,
@@ -408,7 +415,8 @@ CleanFAOSTAT <- function(FAOSTAT){
       multiply_fact,
       ISO3.CODE,
       Item,
-      Year
+      Year,
+      FLAG
     )%>%
     arrange(
       ISO3.CODE,
@@ -469,7 +477,8 @@ CleanFAOSTAT <- function(FAOSTAT){
         Item.Code %in% Legumes ~ "Legumes",
         Item.Code %in% Meat ~ "Meat",
         Item.Code %in% Roots_tuber ~ "Roots & tubers",
-        Item.Code %in% vegetables ~ "Vegetables")
+        Item.Code %in% vegetables ~ "Vegetables"),
+      FLAG
     )%>%
     filter(
       !is.na(Item.Code) 
