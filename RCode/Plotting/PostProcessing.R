@@ -83,6 +83,7 @@ results_df <- ressies%>%filter(model=="m_likelihood_bin" & mxdis==1)
 country_region = openxlsx::read.xlsx("Data/Taxonomies/IsoContinentRegion.xlsx")%>% 
   dplyr::select(ISO.Code, Country, UN.Region, UN.Sub.Region, World.Bank.Income.Groups)%>%rename(ISO3=ISO.Code)
 funcy<-predloss_bin_par
+fdf<-readRDS("./Data/Results/fdf.RData")
 
 global<-itemres<-isores<-data.frame()
 # Cycle over different number of disasters
@@ -272,6 +273,71 @@ p<-isores%>%
   theme(axis.text.x = element_text(angle = 45, hjust = 1),  # Rotate x labels
         plot.title = element_text(size = 14, face = "bold", hjust = 0.5));p
 ggsave("./Plots/RegionLosses_5dis.png",p,height=5,width=7)
+
+
+
+
+
+
+
+params<-readRDS("./Data/Results/params_binLL_mxdis1.RData")
+# params<-params_save
+losses<-predloss_bin_par(fdf, params, mxdis=5, n_sam=1000)
+params$beta_dis <- convert_results_to_params(results_df, fdf, "w_q75")$beta_dis
+tmp<-predloss_bin_par(fdf, params, mxdis=5, n_sam=1000)
+losses$losses <- abind::abind(losses$losses, tmp$losses, along = 4)
+# losses$all_losses <- abind::abind(losses$all_losses, tmp$all_losses, along = 2)
+params$beta_dis <- convert_results_to_params(results_df, fdf, "w_q25")$beta_dis
+tmp<-predloss_bin_par(fdf, params, mxdis=5, n_sam=1000)
+losses$losses <- abind::abind(losses$losses, tmp$losses, along = 4)
+# losses$all_losses <- abind::abind(losses$all_losses, tmp$all_losses, along = 2)
+
+
+
+
+
+
+
+
+
+
+
+params<-readRDS("./Data/Results/params_binLL_mxdis1.RData")
+# params<-params_save
+perclossM<-predloss_bin_par(fdf, params, mxdis=5, n_sam=1000)$losses
+percloss<-data.frame(ndis=5,
+                           ISO3=fdf$isos,
+                           agroGDP=apply(fdf$y*fdf$mu_prices,1,sum,na.rm=T),
+                           Mean=sapply(1:fdf$n_isos,function(i) sum(sapply(1:fdf$n_t,function(j) sum(sapply(1:fdf$n_com,function(k) mean(perclossM[i,j,k,])))))),
+                           Q05=sapply(1:fdf$n_isos,function(i) sum(sapply(1:fdf$n_t,function(j) sum(sapply(1:fdf$n_com,function(k) quantile(perclossM[i,j,k,],probs = c(0.05))))))),
+                           Q95=sapply(1:fdf$n_isos,function(i) sum(sapply(1:fdf$n_t,function(j) sum(sapply(1:fdf$n_com,function(k) quantile(perclossM[i,j,k,],probs = c(0.95))))))))%>%
+                  left_join(country_region,by="ISO3",relationship="one-to-one")
+
+p<-percloss%>%
+  mutate(UN.Region = case_when(is.na(UN.Region) ~ "Not Classified", 
+                               grepl("america",UN.Region,ignore.case = T) ~ "Americas",
+                               T ~ UN.Region)) %>%  # Assign NA to "Not Classified"
+  filter(UN.Region!="Not Classified")%>%
+  group_by(UN.Region) %>%  # Ensure summation by region
+  reframe(
+    Mean = sum(Mean, na.rm = TRUE)*100/sum(agroGDP),
+    Q05 = sum(Q05, na.rm = TRUE)*100/sum(agroGDP),
+    Q95 = sum(Q95, na.rm = TRUE)*100/sum(agroGDP)
+  ) %>%
+  filter(!is.na(Mean) & !is.na(Q05) & !is.na(Q95))%>%
+  ggplot(aes(x = UN.Region, y = Mean, fill = UN.Region)) +
+  geom_bar(stat = "identity", width = 0.7, color = "black") +  # Bar plot
+  geom_errorbar(aes(ymin = Q05, ymax = Q95), width = 0.2) +   # Error bars
+  # theme_minimal() +  # Clean theme
+  labs(y = "Percentage Losses [% Agro-GDP]",
+       x = "Region",
+       title = "Percentage Loss per Agro-GDP, Avg. per Region",
+       fill = "Region") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),  # Rotate x labels
+        plot.title = element_text(size = 14, face = "bold", hjust = 0.5));p
+ggsave("./Plots/RegionLossPerctGDP_5dis.png",p,height=5,width=7)
+
+
 
 # Now for regions
 # Apply smoothing function to each Item_Group separately

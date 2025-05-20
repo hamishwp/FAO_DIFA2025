@@ -119,7 +119,7 @@ CleanEMDAT_API<-function(EMDAT){
   
   #REMOVE IRRELEVANT VARIABLES
   
-  EMDAT%<>%select( 
+  EMDAT%<>%dplyr::select( 
     # -disno,
     -external_ids,
     -name,
