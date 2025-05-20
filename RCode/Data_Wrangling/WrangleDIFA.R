@@ -581,11 +581,9 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023, loggy=T, mxdis=15
   # Hazard types per disaster 
   htype <- array(0, dim = c(n_isos, mxdis)) 
   # Disaster occurrence flag
-  flag <- array(0, dim = c(n_isos, n_t, mxdis),
-                dimnames = list(isos, as.character(yrs), NULL)) 
+  flag <- array(0, dim = c(n_isos, n_t, mxdis)) 
   # Hazard duration per year
-  hazdur <- array(0, dim = c(n_isos, n_t, mxdis),
-                  dimnames = list(isos, as.character(yrs), NULL)) 
+  hazdur <- array(0, dim = c(n_isos, n_t, mxdis)) 
   # Disaster event_id 
   ev_id <- array(NA, dim = c(n_isos, mxdis)) 
   # Disaster severity
@@ -607,16 +605,16 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023, loggy=T, mxdis=15
   # Iterate over all countries
   for(j in 1:length(isos)){
     is<-isos[j]
+    # Filter only the relevant disaster severity records
+    isosev<-redsev%>%filter(ISO3==is)
+    # We need all commodities to have values (this error is very rare but I don't have time to treat it)
+    isosev%<>%filter(disno%in%as.integer(names(table(isosev$disno))[table(isosev$disno)==6]))
     # All years in the data
     for(t in time){
       # All-year commodities data
       y[j,t, ] <- pull(arrange(prod[prod$ISO3.CODE==is & prod$Year==yrs[t],],item_grouping_f),Prod)
       lny[j,t,] <- log(10+y[j,t, ])
     }
-    # Filter only the relevant disaster severity records
-    isosev<-redsev%>%filter(ISO3==is)
-    # We need all commodities to have values (this error is very rare but I don't have time to treat it)
-    isosev%<>%filter(disno%in%as.integer(names(table(isosev$disno))[table(isosev$disno)==6]))
     # Compute AR(1) estimates (phi and sigma) with pre-filled zeros
     for(k in 1:n_com){
       yy<-y[j, ,k]
@@ -634,6 +632,21 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023, loggy=T, mxdis=15
     lnmu_AR1[j,is.na(lnmu_AR1[j,]) | is.infinite(lnmu_AR1[j,])] <- 1
     # if no disasters are present in this country, add empty values
     if(nrow(isosev)!=0){
+      # Create a row index that labels each country's disasters for the matrix
+      minsev<-isosev%>%dplyr::select(-c(item_grouping_f,mu,sd))%>%
+        distinct()%>%mutate(evvie = 1:n())
+      # All years in the data
+      for(t in time){
+        # The awkward disaster variables
+        for(i in 1:nrow(minsev)){
+          if(minsev$year[i]!=yrs[t]) next
+          event <- minsev$evvie[i]
+          # Create the flag variable to indicate whether the disaster contributes to the commodity change of a given year
+          flag[j, t, event] <- 1
+          # Hazard duration information only transmitted to the model during the hazard year
+          hazdur[j, t, event] <- log(pmax(minsev$duration_years[i]*365,1))
+        }
+      }
       # This vector helps speed up the calculations in the stan model
       n_dis_v[j]<-length(unique(isosev$disno))
       # Loop over commodities
@@ -669,19 +682,6 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023, loggy=T, mxdis=15
       mu_dis[j,1:n_dis_v[j], ] <- 0 
       sig_dis[j,1:n_dis_v[j], ] <- 1e-6
     }
-  }
-  # Create a row index that labels each country's disasters for the matrix
-  redsev%<>%dplyr::select(-c(item_grouping_f,mu,sd))%>%
-    distinct()%>%group_by(ISO3)%>%mutate(evvie = 1:n())%>%ungroup()
-  # Now for the awkward disaster variables
-  for(i in 1:nrow(redsev)){
-    iso <- redsev$ISO3[i]
-    event <- redsev$evvie[i]
-    t_chr <- as.character(redsev$sy[i])
-    # Create the flag variable to indicate whether the disaster contributes to the commodity change of a given year
-    flag[iso, t_chr, event] <- 1
-    # Hazard duration information only transmitted to the model during the hazard year
-    hazdur[iso, t_chr, event] <- log(pmax(redsev$duration_years[i]*365,1))
   }
   # Extract the countries and their associated regions, sub-regions, etc
   country_region = read.csv("Data/RawData/country_region.csv")%>% dplyr::select(- X)

@@ -9,7 +9,7 @@
 syear=1991
 fyear=2023
 # Maximum number of disasters per country to be included
-mxdis <- 15
+mxdis <- 30
 # Do we want to use the Desinventar data to infer disaster severity? If not, use EM-DAT multivariate model
 Desinventar<-T
 # MCMC hyperparameters

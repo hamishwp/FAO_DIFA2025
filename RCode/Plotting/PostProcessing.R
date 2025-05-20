@@ -78,17 +78,20 @@ convert_results_to_params <- function(results_df, fdf, metric="w_mean") {
   return(params)
 }
 
-ressies<-readRDS("./Data/Results/results_df_MCMLE.RData")
-results_df <- ressies%>%filter(model=="m_likelihood_bin" & mxdis==1)
+# ressies<-readRDS("./Data/Results/results_df_MCMLE.RData")
+ressies<-readRDS("./Data/Results/results_df_MCMLE_Desinventar.RData")
+# results_df <- ressies%>%filter(model=="m_likelihood_bin" & mxdis==1)
+results_df <- ressies%>%filter(model=="m_likelihood_hazdur" & mxdis==15)
 country_region = openxlsx::read.xlsx("Data/Taxonomies/IsoContinentRegion.xlsx")%>% 
   dplyr::select(ISO.Code, Country, UN.Region, UN.Sub.Region, World.Bank.Income.Groups)%>%rename(ISO3=ISO.Code)
 funcy<-predloss_bin_par
 fdf<-readRDS("./Data/Results/fdf.RData")
 
-global<-itemres<-isores<-data.frame()
+global<-itemres<-isores<-yearly<-data.frame()
 # Cycle over different number of disasters
-for(i in 1:15){
-  params<-readRDS("./Data/Results/params_binLL_mxdis1.RData")
+for(i in c(15)){
+  # params<-readRDS("./Data/Results/params_binLL_mxdis1.RData")
+  params<-readRDS("./Data/Results/params_hazdurLL_mxdis15.RData")
   # params<-params_save
   losses<-funcy(fdf, params, mxdis=i, n_sam=1000)
   params$beta_dis <- convert_results_to_params(results_df, fdf, "w_q75")$beta_dis
@@ -120,6 +123,13 @@ for(i in 1:15){
                      Q05=sapply(1:fdf$n_isos,function(i) sum(sapply(1:fdf$n_t,function(j) sum(sapply(1:fdf$n_com,function(k) quantile(losses$losses[i,j,k,],probs = c(0.05)))))))/1e12,
                      Q95=sapply(1:fdf$n_isos,function(i) sum(sapply(1:fdf$n_t,function(j) sum(sapply(1:fdf$n_com,function(k) quantile(losses$losses[i,j,k,],probs = c(0.95)))))))/1e12)%>%
     left_join(country_region,by="ISO3",relationship="one-to-one"))
+  yearly%<>%rbind(data.frame(
+    ndis=i,
+    year=syear:fyear,
+    Mean=sapply(1:fdf$n_t,function(j) sum(sapply(1:fdf$n_isos,function(i) sum(sapply(1:fdf$n_com,function(k) mean(losses$losses[i,j,k,]))))))/1e12,
+    Q05=sapply(1:fdf$n_t,function(j) sum(sapply(1:fdf$n_isos,function(i) sum(sapply(1:fdf$n_com,function(k) quantile(losses$losses[i,j,k,],probs = c(0.05)))))))/1e12,
+    Q95=sapply(1:fdf$n_t,function(j) sum(sapply(1:fdf$n_isos,function(i) sum(sapply(1:fdf$n_com,function(k) quantile(losses$losses[i,j,k,],probs = c(0.95)))))))/1e12
+  ))
 }
 
 dis_nt<-data.frame(ndis=1:30, tdis=sapply(1:30,function(i) sum(pmin(fdf$n_dis,i))))
@@ -387,13 +397,45 @@ ggsave("./Plots/RegionLosses_NoDis.png",p,height=7,width=10)
 
 
 
+p <- ggplot(yearly, aes(x = year)) +
+  geom_ribbon(aes(x=year, ymin = Q05, ymax = Q95, fill = "90% CI"), alpha = 0.2, inherit.aes = FALSE) +  
+  geom_line(aes(x=year, y = Mean), size = 1) +  
+  labs(y = "Losses [Trillion USD-2017]",
+       title = "Yearly Agricultural & Food Losses",
+       fill = "Confidence Interval") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(hjust = 1),  
+        plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
+        legend.position = "right",
+        axis.title.x.top = element_text(margin = margin(b = 10)),  
+        axis.title.x.bottom = element_text(margin = margin(t = 10)));p
 
+ggsave("./Plots/Temporal_Losses_contmodel.png",p,height=5,width=7)
 
-
-
-
-
-
+p<-isores%>%
+  # filter(ndis==5)%>%
+  mutate(UN.Region = case_when(is.na(UN.Region) ~ "Not Classified",
+                               grepl("america",UN.Region,ignore.case = T) ~ "Americas",
+                               T ~ UN.Region)) %>%  # Assign NA to "Not Classified"
+  filter(UN.Region!="Not Classified")%>%
+  group_by(UN.Region) %>%  # Ensure summation by region
+  reframe(
+    Mean = sum(Mean, na.rm = TRUE),
+    Q05 = sum(Q05, na.rm = TRUE),
+    Q95 = sum(Q95, na.rm = TRUE)
+  ) %>%
+  filter(!is.na(Mean) & !is.na(Q05) & !is.na(Q95))%>%
+ggplot(aes(x = UN.Region, y = Mean, fill = UN.Region)) +
+  geom_bar(stat = "identity", width = 0.7, color = "black") +  # Bar plot
+  geom_errorbar(aes(ymin = Q05, ymax = Q95), width = 0.2) +   # Error bars
+  # theme_minimal() +  # Clean theme
+  labs(y = "Losses [Trillion USD-2017]",
+       x = "Region",
+       title = "Estimated Agricultural & Food Losses by Region",
+       fill = "Region") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),  # Rotate x labels
+        plot.title = element_text(size = 14, face = "bold", hjust = 0.5));p
+ggsave("./Plots/RegionLosses_contdissev.png",p,height=5,width=7)
 
 
 
