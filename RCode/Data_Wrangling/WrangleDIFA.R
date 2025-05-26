@@ -562,7 +562,10 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023, loggy=T, mxdis=15
     left_join(faostat$item_groups,by=c("Item"))%>%
     filter(!is.na(item_grouping_f) & Year>=syear & Year<=fyear)%>%
     group_by(ISO3.CODE,item_grouping_f,Year)%>%
-    reframe(Prod=sum(Production,na.rm = T))%>%mutate(Year=as.integer(Year))%>%
+    reframe(Prod=sum(Production,na.rm = T),
+            official = weighted.mean(FLAG%in%c("A",""), log(Production+1), na.rm = TRUE))%>%
+    mutate(Year=as.integer(Year),
+           official = case_when(is.na(official) ~ 0, T ~ official))%>%
     arrange(item_grouping_f)
   # Ensure all commodities exist for each country-year combination
   prod <- prod %>%
@@ -591,13 +594,16 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023, loggy=T, mxdis=15
   # AR1-related variables
   mu_AR1 <- array(0, dim = c(n_isos, n_com)) 
   sig_AR1 <- array(0, dim = c(n_isos, n_com)) 
+  noise_sig <- array(0, dim = c(n_isos, n_com)) 
   lnmu_AR1 <- array(0, dim = c(n_isos, n_com)) 
   lnsig_AR1 <- array(0, dim = c(n_isos, n_com)) 
+  lnnoise_sig <- array(0, dim = c(n_isos, n_com)) 
   # Disaster severity sampling (replaces iprox)
   mu_dis <- array(0, dim = c(n_isos, mxdis, n_com)) 
   sig_dis <- array(0, dim = c(n_isos, mxdis, n_com)) 
   # Commodity data
   y <- lny <- array(0, dim = c(n_isos, n_t, n_com)) 
+  official <- array(1, dim = c(n_isos, n_t, n_com)) 
   # Create an array of the number of disasters per country
   n_dis_v<-integer(n_t)
   # Which commodities are we covering?
@@ -621,14 +627,18 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023, loggy=T, mxdis=15
       lnyy<-lny[j, ,k]
       # Calculate the AR1 components on both the normal and log scale production data
       mu_AR1[j,k] <- mean(yy[2:n_t]/yy[1:(n_t-1)],na.rm=T)
-      sig_AR1[j,k] <- mean(abs(diff(yy)),na.rm = T)
+      sig_AR1[j,k] <- pmax(1e-6,sd(yy[2:n_t] - mu_AR1[j,k]*yy[1:(n_t-1)],na.rm = T))
+      noise_sig[j,k] <- pmax(1e-6,sd(yy,na.rm = T))
       lnmu_AR1[j,k] <- mean(lnyy[2:n_t]/lnyy[1:(n_t-1)],na.rm=T)
-      lnsig_AR1[j,k] <- mean(abs(diff(lnyy)),na.rm = T)
+      lnsig_AR1[j,k] <- pmax(1e-6,sd(lnyy[2:n_t] - lnmu_AR1[j,k]*lnyy[1:(n_t-1)],na.rm = T))
+      lnnoise_sig[j,k] <- pmax(1e-6,sd(lnyy,na.rm = T))
     }
     # Ensuring AR1 values are coherent with the model
     sig_AR1[j,is.na(mu_AR1[j,]) | is.infinite(mu_AR1[j,])] <- 1e-6
+    noise_sig[j,is.na(mu_AR1[j,]) | is.infinite(mu_AR1[j,])] <- 1e-6
     mu_AR1[j,is.na(mu_AR1[j,]) | is.infinite(mu_AR1[j,])] <- 1
     lnsig_AR1[j,is.na(lnmu_AR1[j,]) | is.infinite(lnmu_AR1[j,])] <- 1e-6
+    lnnoise_sig[j,is.na(mu_AR1[j,]) | is.infinite(mu_AR1[j,])] <- 1e-6
     lnmu_AR1[j,is.na(lnmu_AR1[j,]) | is.infinite(lnmu_AR1[j,])] <- 1
     # if no disasters are present in this country, add empty values
     if(nrow(isosev)!=0){
@@ -687,6 +697,7 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023, loggy=T, mxdis=15
   country_region = read.csv("Data/RawData/country_region.csv")%>% dplyr::select(- X)
   # Extract & impute country commodity price data
   prices <- faostat$price %>%
+    dplyr::select(-item_grouping_f)%>%
     filter(Year <= fyear & Year >= syear)%>%
     left_join(faostat$item_groups, by = c("Item")) %>%
     filter(!is.na(item_grouping_f))%>%distinct()%>%
@@ -711,6 +722,7 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023, loggy=T, mxdis=15
             commods=commods,
             y = y,
             lny = lny,
+            official=official,
             htype = htype,
             ev_id = ev_id,
             iprox = iprox,
@@ -718,8 +730,10 @@ Prepare4Model<-function(faostat,sevvies,syear=1991,fyear=2023, loggy=T, mxdis=15
             hazdur = hazdur,
             mu_AR1 = mu_AR1,
             sig_AR1 = sig_AR1,
+            noise_sig=noise_sig,
             lnmu_AR1 = lnmu_AR1,
             lnsig_AR1 = lnsig_AR1,
+            lnnoise_sig = lnnoise_sig,
             mu_dis=mu_dis,
             sig_dis=sig_dis,
             mu_prices=prices$mu_price,

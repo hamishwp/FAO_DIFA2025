@@ -52,7 +52,8 @@ GetFAOSTAT_All<-function(syear=1990,fyear=NULL){
               MF = FAOSTAT$MF,
               Area = FAOSTAT$Area,
               Prod = FAOSTAT$Prod,
-              price=GetFAOSTAT_Price(syear=syear,fyear=fyear)))
+              price=GetFAOSTAT_Price(syear=syear,fyear=fyear),
+              item_groups = FAOSTAT$item_groups))
 }
 
 GetFAOSTAT_Prod<-function(syear=1990,fyear=NULL){
